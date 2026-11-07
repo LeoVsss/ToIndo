@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Símbolo Tô indo!: pin de localização com seta "a caminho" -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="28dp"
+    android:height="28dp"
+    android:viewportWidth="28"
+    android:viewportHeight="28">
+    <path
+        android:fillColor="@color/azul_toindo"
+        android:pathData="M8,0h12a8,8 0,0 1,8 8v12a8,8 0,0 1,-8 8h-12a8,8 0,0 1,-8 -8v-12a8,8 0,0 1,8 -8z" />
+    <path
+        android:fillColor="@color/branco"
+        android:pathData="M14,23C14,23 8,17.5 8,12.5A6,6 0,0 1,20 12.5C20,17.5 14,23 14,23Z" />
+    <path
+        android:strokeColor="@color/azul_toindo"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M12.6,9.6L15.4,12.5L12.6,15.4" />
+</vector>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Primeiro plano do ícone adaptativo (108dp, área segura de 66dp no centro) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="33"
+        android:translateY="31"
+        android:scaleX="1.5"
+        android:scaleY="1.5">
+        <path
+            android:fillColor="@color/branco"
+            android:pathData="M14,30C14,30 2,19 2,12A12,12 0,0 1,26 12C26,19 14,30 14,30Z" />
+        <path
+            android:strokeColor="@color/azul_toindo"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M11.5,7L16.5,12L11.5,17" />
+    </group>
+</vector>
