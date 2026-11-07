@@ -57,12 +57,13 @@ class AjustesViewModel : ViewModel() {
 fun AjustesScreen(
     onEditarResidencia: () -> Unit,
     onObjetos: () -> Unit,
-    onAbrirSimulador: () -> Unit = {},
+    onAbrirSaidas: () -> Unit = {},
     vm: AjustesViewModel = viewModel(),
 ) {
     val config by vm.configuracao.collectAsStateWithLifecycle()
     val casa by vm.residencia.collectAsStateWithLifecycle()
     val objetos by vm.objetos.collectAsStateWithLifecycle()
+    val saidas by RepositorioToIndo.saidas.collectAsStateWithLifecycle()
     var tarifaTexto by remember { mutableStateOf("%.2f".format(config.tarifaKwh).replace('.', ',')) }
 
     Column(
@@ -78,7 +79,8 @@ fun AjustesScreen(
             })
             LinhaDeLista("Raio de saída", valor = formatarDistancia(casa.raioSaidaM), onClick = onEditarResidencia)
             LinhaDeLista("Raio de aproximação", valor = formatarDistancia(casa.raioAproximacaoM), onClick = onEditarResidencia)
-            LinhaDeLista("Confirmar saída após", valor = "${config.tempoConfirmacaoSaidaMin} min", onClick = onEditarResidencia, divisor = false)
+            LinhaDeLista("Confirmar saída após", valor = formatarSegundos(config.tempoConfirmacaoSaidaSeg), onClick = onEditarResidencia)
+            LinhaDeLista("Saídas de casa", valor = "${saidas.size}", onClick = onAbrirSaidas, divisor = false)
         }
 
         RotuloDeSecao("Energia")
@@ -104,16 +106,6 @@ fun AjustesScreen(
             LinhaDeLista("Editar residência", onClick = onEditarResidencia)
             LinhaDeLista("Objetos inteligentes", valor = "${objetos.size}", onClick = onObjetos)
             LinhaDeLista("Moradores", valor = "2", onClick = { /* lista de moradores (RN05) */ }, divisor = false)
-        }
-
-        RotuloDeSecao("Protótipo")
-        CardToIndo(padding = Espaco.l) {
-            LinhaDeLista(
-                "Simulador de presença",
-                detalhe = "Teste a automação movendo sua localização (sem sair de casa)",
-                onClick = onAbrirSimulador,
-                divisor = false,
-            )
         }
 
         RotuloDeSecao("Notificações e privacidade")

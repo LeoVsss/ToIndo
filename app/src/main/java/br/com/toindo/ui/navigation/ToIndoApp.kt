@@ -37,6 +37,8 @@ import br.com.toindo.ui.screens.DetalheObjetoScreen
 import br.com.toindo.ui.screens.HistoricoScreen
 import br.com.toindo.ui.screens.InicioScreen
 import br.com.toindo.ui.screens.ResidenciaScreen
+import br.com.toindo.ui.screens.SaidaDetalheScreen
+import br.com.toindo.ui.screens.SaidasScreen
 
 /** Rotas do fluxo de navegação (seção 3 do documento). */
 object Rotas {
@@ -48,7 +50,6 @@ object Rotas {
     const val CONSUMO = "consumo"                  // T6
     const val HISTORICO = "historico"              // T7
     const val AJUSTES = "ajustes"                  // T8
-    const val SIMULACAO = "simulacao"              // Protótipo: simulador de presença (GPS falso)
 
     fun objeto(id: Long) = "objeto/$id"
     const val SAIDAS = "saidas"
@@ -72,12 +73,12 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
     val rotaAtual = entrada?.destination?.route
     val mostrarBarra = abas.any { it.rota == rotaAtual }
 
-    // Notificação do protótipo: abre o detalhe da saída.
-    val pedidoSaida by br.com.toindo.prototipo.PedidoAbrirSaida.pendente.collectAsState()
+    // Notificação de saída/volta: abre o detalhe daquela saída.
+    val pedidoSaida by br.com.toindo.service.PedidoAbrirSaida.pendente.collectAsState()
     LaunchedEffect(pedidoSaida) {
         pedidoSaida?.let { id ->
             navController.navigate(Rotas.saida(id))
-            br.com.toindo.prototipo.PedidoAbrirSaida.pendente.value = null
+            br.com.toindo.service.PedidoAbrirSaida.pendente.value = null
         }
     }
 
@@ -118,6 +119,7 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
                     onAbrirObjeto = { navController.navigate(Rotas.objeto(it)) },
                     onAdicionar = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
                     onAbrirHistorico = { navegarAba(navController, Rotas.HISTORICO) },
+                    onAbrirSaidas = { navController.navigate(Rotas.SAIDAS) },
                 )
             }
             composable(Rotas.OBJETO, arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
@@ -133,23 +135,17 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
                 AjustesScreen(
                     onEditarResidencia = { navController.navigate(Rotas.RESIDENCIA) },
                     onObjetos = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
-                    onAbrirSimulador = { navController.navigate(Rotas.SIMULACAO) },
-                )
-            }
-            composable(Rotas.SIMULACAO) {
-                br.com.toindo.prototipo.SimulacaoScreen(
-                    onVoltar = { navController.popBackStack() },
                     onAbrirSaidas = { navController.navigate(Rotas.SAIDAS) },
                 )
             }
             composable(Rotas.SAIDAS) {
-                br.com.toindo.prototipo.SaidasScreen(
+                SaidasScreen(
                     onVoltar = { navController.popBackStack() },
                     onAbrirSaida = { navController.navigate(Rotas.saida(it)) },
                 )
             }
             composable(Rotas.SAIDA, arguments = listOf(navArgument("id") { type = NavType.LongType })) { e ->
-                br.com.toindo.prototipo.SaidaDetalheScreen(
+                SaidaDetalheScreen(
                     saidaId = e.arguments?.getLong("id") ?: 0L,
                     onVoltar = { navController.popBackStack() },
                 )

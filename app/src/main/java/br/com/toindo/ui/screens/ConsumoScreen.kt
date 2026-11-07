@@ -49,7 +49,17 @@ import br.com.toindo.ui.components.TituloDeTela
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import androidx.lifecycle.viewModelScope
+import br.com.toindo.data.local.RegistroConsumoEntity
+import br.com.toindo.data.local.ResultadoSaida
+import br.com.toindo.domain.CalculadoraConsumo
+import br.com.toindo.model.ConsumoObjeto
+import java.util.Calendar
 
 enum class Periodo(val rotulo: String) { DIA("Dia"), SEMANA("Semana"), MES("Mês") }
 
@@ -58,14 +68,77 @@ class ConsumoViewModel : ViewModel() {
     val periodo = _periodo.asStateFlow()
     fun escolher(p: Periodo) { _periodo.value = p }
 
-    // Exemplo da semana. Na fase Prototype: somar registro_consumo do Room por período.
-    val dias = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Hoje")
-    val valores = RepositorioToIndo.consumoSemana
-    val porObjeto = RepositorioToIndo.consumoPorObjeto
-    val totalKwh get() = valores.sum()
-    val tarifa get() = RepositorioToIndo.configuracao.value.tarifaKwh
-    val economia = RepositorioToIndo.ECONOMIA_ESTIMADA_SEMANA
+    /**
+     * Tudo calculado dos registros REAIS do Room (intervalos ligado->desligado fechados) e
+     * do histórico de saídas. Sem dados, mostra zero — nada de números de exemplo.
+     */
+    val ui: StateFlow<ConsumoUi> = combine(
+        _periodo, RepositorioToIndo.registrosConsumo, RepositorioToIndo.saidas, RepositorioToIndo.configuracao,
+    ) { p, registros, saidas, config ->
+        val desde = inicioDoPeriodo(p)
+        val doPeriodo = registros.filter { it.fimMillis >= desde }
+        val porObjeto = doPeriodo.groupBy { it.objetoNome }
+            .map { (nome, l) -> ConsumoObjeto(nome, l.sumOf { it.kWh }, l.sumOf { it.custo }) }
+            .sortedByDescending { it.kWh }
+
+        // Economia = o que os objetos desligados pela automação teriam gastado enquanto você estava fora.
+        val agora = System.currentTimeMillis()
+        val kWhEvitado = saidas.filter { it.saida.saiuEmMillis >= desde }.sumOf { s ->
+            val fim = s.saida.voltouEmMillis ?: agora
+            s.itens.filter { it.naSaida == ResultadoSaida.DESLIGOU }
+                .sumOf { CalculadoraConsumo.kWh(RepositorioToIndo.potenciaW(it.objetoId), fim - s.saida.saiuEmMillis) }
+        }
+
+        val (rotulos, valores) = ultimosSeteDias(registros)
+        ConsumoUi(
+            totalKwh = doPeriodo.sumOf { it.kWh },
+            totalCusto = doPeriodo.sumOf { it.custo },
+            porObjeto = porObjeto,
+            economia = CalculadoraConsumo.custo(kWhEvitado, config.tarifaKwh),
+            tarifa = config.tarifaKwh,
+            dias = rotulos,
+            valores = valores,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConsumoUi())
+
+    private fun inicioDoPeriodo(p: Periodo): Long {
+        val c = Calendar.getInstance()
+        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
+        when (p) {
+            Periodo.DIA -> Unit
+            Periodo.SEMANA -> c.add(Calendar.DAY_OF_YEAR, -6)
+            Periodo.MES -> c.add(Calendar.DAY_OF_YEAR, -29)
+        }
+        return c.timeInMillis
+    }
+
+    /** kWh por dia local (fuso do aparelho) dos últimos 7 dias, para o gráfico. */
+    private fun ultimosSeteDias(registros: List<RegistroConsumoEntity>): Pair<List<String>, List<Double>> {
+        val nomes = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
+        val rotulos = mutableListOf<String>()
+        val valores = mutableListOf<Double>()
+        for (diasAtras in 6 downTo 0) {
+            val ini = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+                add(Calendar.DAY_OF_YEAR, -diasAtras)
+            }
+            val fim = ini.timeInMillis + 24L * 60 * 60 * 1000
+            rotulos += if (diasAtras == 0) "Hoje" else nomes[ini.get(Calendar.DAY_OF_WEEK) - 1]
+            valores += registros.filter { it.fimMillis >= ini.timeInMillis && it.fimMillis < fim }.sumOf { it.kWh }
+        }
+        return rotulos to valores
+    }
 }
+
+data class ConsumoUi(
+    val totalKwh: Double = 0.0,
+    val totalCusto: Double = 0.0,
+    val porObjeto: List<ConsumoObjeto> = emptyList(),
+    val economia: Double = 0.0,
+    val tarifa: Double = 0.79,
+    val dias: List<String> = emptyList(),
+    val valores: List<Double> = emptyList(),
+)
 
 fun Double.brl(): String = "R$ " + "%.2f".format(this).replace('.', ',')
 fun Double.kwh(): String = "%.1f".format(this).replace('.', ',') + " kWh"
@@ -74,6 +147,7 @@ fun Double.kwh(): String = "%.1f".format(this).replace('.', ',') + " kWh"
 @Composable
 fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
     val periodo by vm.periodo.collectAsStateWithLifecycle()
+    val ui by vm.ui.collectAsStateWithLifecycle()
     var formulaAberta by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -86,21 +160,27 @@ fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
         CardToIndo(padding = Espaco.margem) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
-                    Text(vm.totalKwh.kwh(), style = MaterialTheme.typography.displaySmall)
-                    Text((vm.totalKwh * vm.tarifa).brl(), style = MaterialTheme.typography.titleMedium, color = ToIndo.extras.energiaTexto)
+                    Text(ui.totalKwh.kwh(), style = MaterialTheme.typography.displaySmall)
+                    Text(ui.totalCusto.brl(), style = MaterialTheme.typography.titleMedium, color = ToIndo.extras.energiaTexto)
                 }
                 SeloEstimado()
             }
-            GraficoBarras(vm.dias, vm.valores)
+            GraficoBarras(ui.dias, ui.valores)
         }
 
         CardToIndo(padding = Espaco.l) {
-            vm.porObjeto.forEach { c ->
+            if (ui.porObjeto.isEmpty()) {
+                Text(
+                    "Ainda sem consumo registrado neste período. O consumo é contado quando um objeto que estava ligado é desligado.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            ui.porObjeto.forEach { c ->
                 LinhaDeLista(c.nome, valor = "${c.kWh.kwh()} · ${c.custo.brl()}", corValor = ToIndo.extras.energiaTexto)
             }
             Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.s)) {
                 Icon(Icons.AutoMirrored.Rounded.TrendingDown, null, tint = ToIndo.extras.economiaTexto)
-                Text("Economia estimada: ${vm.economia.brl()} com a casa vazia", style = MaterialTheme.typography.bodyMedium, color = ToIndo.extras.economiaTexto)
+                Text("Economia estimada: ${ui.economia.brl()} com a casa vazia", style = MaterialTheme.typography.bodyMedium, color = ToIndo.extras.economiaTexto)
             }
         }
 
@@ -115,7 +195,7 @@ fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
             }
             AnimatedVisibility(formulaAberta) {
                 Text(
-                    "Para cada objeto: kWh = potência (W) × horas ligado ÷ 1000. Custo = kWh × tarifa (${vm.tarifa.brl()}/kWh). " +
+                    "Para cada objeto: kWh = potência (W) × horas ligado ÷ 1000. Custo = kWh × tarifa (${ui.tarifa.brl()}/kWh). " +
                         "É uma estimativa: os objetos não medem o consumo real.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Espaco.s),

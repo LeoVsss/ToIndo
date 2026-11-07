@@ -8,7 +8,10 @@ import androidx.room.TypeConverters
 
 /**
  * Banco local do app (seção 5: "Room (local) para eventos, regras e consumo").
- * Única fonte da verdade local — o estado dos objetos sobrevive ao fechamento do app (RNF04).
+ * Única fonte da verdade local - o estado dos objetos sobrevive ao fechamento do app (RNF04).
+ *
+ * v2: presença persistida + histórico de saídas (saidas / saida_itens) e confirmação em segundos.
+ * Por ser protótipo, uma mudança de versão recria o banco (fallbackToDestructiveMigration).
  */
 @Database(
     entities = [
@@ -17,8 +20,11 @@ import androidx.room.TypeConverters
         EventoEntity::class,
         ConfiguracaoEntity::class,
         RegistroConsumoEntity::class,
+        PresencaEntity::class,
+        SaidaEntity::class,
+        SaidaItemEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -28,6 +34,8 @@ abstract class ToIndoDatabase : RoomDatabase() {
     abstract fun eventoDao(): EventoDao
     abstract fun configuracaoDao(): ConfiguracaoDao
     abstract fun registroConsumoDao(): RegistroConsumoDao
+    abstract fun presencaDao(): PresencaDao
+    abstract fun saidaDao(): SaidaDao
 
     companion object {
         @Volatile private var instancia: ToIndoDatabase? = null
@@ -38,7 +46,8 @@ abstract class ToIndoDatabase : RoomDatabase() {
                     context.applicationContext,
                     ToIndoDatabase::class.java,
                     "toindo.db",
-                ).build().also { instancia = it }
+                ).fallbackToDestructiveMigration()
+                    .build().also { instancia = it }
             }
     }
 }

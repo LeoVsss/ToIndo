@@ -76,8 +76,8 @@ data class Residencia(
     val nome: String,
     val latitude: Double,
     val longitude: Double,
-    val raioSaidaM: Int = 300,
-    val raioAproximacaoM: Int = 2000,
+    val raioSaidaM: Int = 30,
+    val raioAproximacaoM: Int = 100,
 )
 
 data class EventoObjeto(
@@ -96,7 +96,8 @@ data class ConsumoObjeto(val nome: String, val kWh: Double, val custo: Double)
 
 data class Configuracao(
     val tarifaKwh: Double = 0.79,
-    val tempoConfirmacaoSaidaMin: Int = 5,
+    /** Segundos fora do raio antes de confirmar a saída (anti-oscilação do GPS). 0 = imediato. */
+    val tempoConfirmacaoSaidaSeg: Int = 10,
     val notificacoesAtivas: Boolean = true,
     val automacaoAtiva: Boolean = true,
 )

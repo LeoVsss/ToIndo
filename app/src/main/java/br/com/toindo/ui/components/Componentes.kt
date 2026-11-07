@@ -146,10 +146,12 @@ fun RotuloDeSecao(texto: String, modifier: Modifier = Modifier) {
 
 /** Pílula de presença: estado da automação visível sem toque (princípio 1). */
 @Composable
-fun PilulaPresenca(estado: EstadoPresenca, automacaoAtiva: Boolean, minutosRestantes: Int? = null) {
+fun PilulaPresenca(estado: EstadoPresenca, automacaoAtiva: Boolean, segundosRestantes: Int? = null) {
     val (texto, cor) = when (estado) {
         EstadoPresenca.EM_CASA -> "Você está em casa" to ToIndo.extras.presenca
-        EstadoPresenca.CONFIRMANDO_SAIDA -> "Desligando em ${minutosRestantes ?: "?"} min" to MaterialTheme.colorScheme.tertiary
+        EstadoPresenca.CONFIRMANDO_SAIDA ->
+            (if (segundosRestantes != null && segundosRestantes > 0) "Desligando em ${segundosRestantes}s" else "Confirmando saída...") to
+                MaterialTheme.colorScheme.tertiary
         EstadoPresenca.FORA -> "Você está fora" to MaterialTheme.colorScheme.onSurfaceVariant
         EstadoPresenca.CHEGANDO -> "Você está chegando" to MaterialTheme.colorScheme.primary
     }

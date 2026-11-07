@@ -4,19 +4,20 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import br.com.toindo.MainActivity
 import br.com.toindo.R
 import br.com.toindo.data.RepositorioToIndo
-import br.com.toindo.domain.Geo
-import br.com.toindo.domain.MotorAutomacao
-import br.com.toindo.model.EstadoPresenca
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
@@ -24,72 +25,52 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
 /**
- * Serviço em primeiro plano que monitora a localização e dispara a automação por presença
- * (RF03–RF05; RNF01 — usa prioridade balanceada, não GPS contínuo de alta precisão).
+ * Serviço em primeiro plano que lê o GPS REAL do celular e repassa cada posição ao
+ * [RepositorioToIndo.avaliarPosicao], que decide se você saiu/voltou e aplica a automação.
  *
- * Mantém a máquina de estados do [MotorAutomacao] e delega as ações ao [RepositorioToIndo].
- * Para o protótipo, roda enquanto o app está ativo; a evolução é migrar para geofencing
- * puro + WorkManager para funcionar 100% com o app fechado (seção 6 / risco de background).
+ * Protótipo: GPS de alta precisão a cada ~3 s, para conseguir testar com raios pequenos
+ * (a partir de 5 m). O custo é bateria; a evolução é usar geofencing (seção 6 do PLAN).
+ * Continua funcionando com a tela apagada e o app em segundo plano (notificação fixa).
  */
 class PresencaService : Service() {
 
     private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
-    private var presencaAtual = EstadoPresenca.EM_CASA
-    private var inicioConfirmacao: Long? = null
+    private var ativo = false
 
     private val callback = object : LocationCallback() {
         override fun onLocationResult(resultado: LocationResult) {
             val loc = resultado.lastLocation ?: return
-            avaliar(loc.latitude, loc.longitude)
+            RepositorioToIndo.avaliarPosicao(
+                loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy.toInt() else null,
+            )
         }
     }
 
     override fun onCreate() {
         super.onCreate()
-        startForeground(NOTIF_ID, notificacao())
-        presencaAtual = RepositorioToIndo.presenca.value
+        val tipo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        ServiceCompat.startForeground(this, NOTIF_ID, notificacao(), tipo)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (temPermissaoLocalizacao()) solicitarAtualizacoes()
+        if (!temPermissaoLocalizacao()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!ativo) solicitarAtualizacoes()
         return START_STICKY
     }
 
     private fun solicitarAtualizacoes() {
-        val req = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, INTERVALO_MS)
+        val req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, INTERVALO_MS)
             .setMinUpdateIntervalMillis(INTERVALO_MIN_MS)
+            .setWaitForAccurateLocation(false)
             .build()
         try {
             fused.requestLocationUpdates(req, callback, mainLooper)
+            ativo = true
         } catch (_: SecurityException) {
             stopSelf()
-        }
-    }
-
-    private fun avaliar(lat: Double, lon: Double) {
-        val casa = RepositorioToIndo.residencia.value
-        val config = RepositorioToIndo.configuracao.value
-        val distancia = Geo.distanciaM(lat, lon, casa.latitude, casa.longitude)
-
-        // RN01: começa a contar o tempo de confirmação ao sair do raio.
-        if (presencaAtual == EstadoPresenca.EM_CASA && distancia > casa.raioSaidaM && inicioConfirmacao == null) {
-            inicioConfirmacao = System.currentTimeMillis()
-        }
-
-        val proxima = MotorAutomacao.proximaPresenca(
-            atual = presencaAtual,
-            distanciaM = distancia,
-            raioSaidaM = casa.raioSaidaM,
-            raioAproximacaoM = casa.raioAproximacaoM,
-            inicioConfirmacaoMillis = inicioConfirmacao,
-            agoraMillis = System.currentTimeMillis(),
-            tempoConfirmacaoMin = config.tempoConfirmacaoSaidaMin,
-        )
-
-        if (proxima != presencaAtual) {
-            RepositorioToIndo.aplicarTransicaoPresenca(presencaAtual, proxima)
-            presencaAtual = proxima
-            if (proxima == EstadoPresenca.EM_CASA || proxima == EstadoPresenca.FORA) inicioConfirmacao = null
         }
     }
 
@@ -101,19 +82,24 @@ class PresencaService : Service() {
         val gerenciador = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             gerenciador.createNotificationChannel(
-                NotificationChannel(CANAL, "Automação por presença", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CANAL, "Monitoramento de presença", NotificationManager.IMPORTANCE_LOW)
             )
         }
+        val abrir = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE,
+        )
         return NotificationCompat.Builder(this, CANAL)
             .setContentTitle("Tô indo! ativo")
             .setContentText("Cuidando dos seus objetos pela sua localização.")
             .setSmallIcon(R.drawable.ic_logo)
+            .setContentIntent(abrir)
             .setOngoing(true)
             .build()
     }
 
     override fun onDestroy() {
         fused.removeLocationUpdates(callback)
+        ativo = false
         super.onDestroy()
     }
 
@@ -122,12 +108,11 @@ class PresencaService : Service() {
     companion object {
         private const val CANAL = "presenca"
         private const val NOTIF_ID = 42
-        private const val INTERVALO_MS = 60_000L      // 1 min (RNF01: economiza bateria)
-        private const val INTERVALO_MIN_MS = 30_000L
+        private const val INTERVALO_MS = 3_000L
+        private const val INTERVALO_MIN_MS = 2_000L
 
         fun iniciar(context: Context) {
-            val intent = Intent(context, PresencaService::class.java)
-            ContextCompat.startForegroundService(context, intent)
+            ContextCompat.startForegroundService(context, Intent(context, PresencaService::class.java))
         }
 
         fun parar(context: Context) {

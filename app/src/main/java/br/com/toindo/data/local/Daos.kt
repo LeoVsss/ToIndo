@@ -13,6 +13,9 @@ interface ResidenciaDao {
     @Query("SELECT * FROM residencia WHERE id = 1")
     fun observar(): Flow<ResidenciaEntity?>
 
+    @Query("SELECT * FROM residencia WHERE id = 1")
+    suspend fun obter(): ResidenciaEntity?
+
     @Upsert
     suspend fun salvar(residencia: ResidenciaEntity)
 }
@@ -78,8 +81,59 @@ interface RegistroConsumoDao {
     /** kWh total por dia (epoch do início do dia local é calculado na camada de domínio). */
     @Query("SELECT inicioMillis, fimMillis, kWh FROM registros_consumo WHERE fimMillis >= :desdeMillis")
     fun observarIntervalosDesde(desdeMillis: Long): Flow<List<IntervaloConsumo>>
+
+    /** Todos os intervalos fechados a partir de um instante (tela de Consumo agrega por período). */
+    @Query("SELECT * FROM registros_consumo WHERE fimMillis >= :desdeMillis ORDER BY fimMillis")
+    fun observarDesde(desdeMillis: Long): Flow<List<RegistroConsumoEntity>>
 }
 
 /** Projeções de consulta (não são tabelas). */
 data class ConsumoAgrupado(val nome: String, val kWh: Double, val custo: Double)
 data class IntervaloConsumo(val inicioMillis: Long, val fimMillis: Long, val kWh: Double)
+
+@Dao
+interface PresencaDao {
+    @Query("SELECT * FROM presenca WHERE id = 1")
+    suspend fun obter(): PresencaEntity?
+
+    @Upsert
+    suspend fun salvar(p: PresencaEntity)
+}
+
+/** Saída + o que aconteceu com cada dispositivo. */
+data class SaidaComItens(
+    @androidx.room.Embedded val saida: SaidaEntity,
+    @androidx.room.Relation(parentColumn = "id", entityColumn = "saidaId") val itens: List<SaidaItemEntity>,
+)
+
+@Dao
+interface SaidaDao {
+    @Insert
+    suspend fun inserir(s: SaidaEntity)
+
+    @Insert
+    suspend fun inserirItens(itens: List<SaidaItemEntity>)
+
+    @Query("SELECT * FROM saida_itens WHERE saidaId = :saidaId")
+    suspend fun itens(saidaId: Long): List<SaidaItemEntity>
+
+    @Query("UPDATE saidas SET voltouEmMillis = :voltou, distanciaMaxM = :distanciaMaxM WHERE id = :id")
+    suspend fun fechar(id: Long, voltou: Long, distanciaMaxM: Int)
+
+    @Query("UPDATE saida_itens SET naVolta = :resultado WHERE saidaId = :saidaId AND objetoId = :objetoId")
+    suspend fun resultadoVolta(saidaId: Long, objetoId: Long, resultado: String)
+
+    @androidx.room.Transaction
+    @Query("SELECT * FROM saidas ORDER BY saiuEmMillis DESC")
+    fun observarTodas(): Flow<List<SaidaComItens>>
+
+    @androidx.room.Transaction
+    @Query("SELECT * FROM saidas WHERE id = :id")
+    fun observar(id: Long): Flow<SaidaComItens?>
+
+    @Query("DELETE FROM saida_itens")
+    suspend fun apagarItens()
+
+    @Query("DELETE FROM saidas")
+    suspend fun apagarSaidas()
+}

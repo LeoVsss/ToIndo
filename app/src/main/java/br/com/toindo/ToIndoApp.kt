@@ -14,7 +14,6 @@ import br.com.toindo.data.remote.ServicoDispositivoMock
 class ToIndoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        br.com.toindo.prototipo.EstadoPrototipo.iniciar(this)
         RepositorioToIndo.iniciar(
             context = this,
             servicoDispositivo = ServicoDispositivoMock(),

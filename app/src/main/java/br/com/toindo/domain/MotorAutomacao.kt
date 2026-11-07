@@ -17,8 +17,10 @@ object MotorAutomacao {
      * Calcula o novo estado de presença a partir da distância do morador até a casa.
      * - Sai do raio de saída -> começa a confirmar (RN01).
      * - Fica fora do raio de saída por >= tempoConfirmacao -> FORA.
-     * - Entra no raio de aproximação -> CHEGANDO (RN02).
-     * - Entra no raio de saída -> EM_CASA.
+     * - Volta para dentro do raio de saída -> EM_CASA (religa o que foi desligado).
+     * - Estando FORA, entra no raio de aproximação E está de fato voltando -> CHEGANDO (RN02).
+     *   "Voltando" = chegou pelo menos [margemVoltaM] mais perto que o ponto mais distante.
+     *   Sem isso, sair e parar a poucos metros (ainda dentro da aproximação) já contava como chegada.
      */
     fun proximaPresenca(
         atual: EstadoPresenca,
@@ -27,10 +29,13 @@ object MotorAutomacao {
         raioAproximacaoM: Int,
         inicioConfirmacaoMillis: Long?,
         agoraMillis: Long,
-        tempoConfirmacaoMin: Int,
+        tempoConfirmacaoSeg: Int,
+        maxDistanciaForaM: Double,
     ): EstadoPresenca {
         val dentroSaida = distanciaM <= raioSaidaM
         val dentroAproximacao = distanciaM <= raioAproximacaoM
+        val margemVoltaM = minOf(30.0, raioSaidaM.toDouble())
+        val voltando = distanciaM <= maxDistanciaForaM - margemVoltaM
 
         return when (atual) {
             EstadoPresenca.EM_CASA ->
@@ -39,12 +44,15 @@ object MotorAutomacao {
             EstadoPresenca.CONFIRMANDO_SAIDA -> when {
                 dentroSaida -> EstadoPresenca.EM_CASA // voltou: oscilação de GPS (RN01)
                 inicioConfirmacaoMillis != null &&
-                    agoraMillis - inicioConfirmacaoMillis >= tempoConfirmacaoMin * 60_000L -> EstadoPresenca.FORA
+                    agoraMillis - inicioConfirmacaoMillis >= tempoConfirmacaoSeg * 1_000L -> EstadoPresenca.FORA
                 else -> EstadoPresenca.CONFIRMANDO_SAIDA
             }
 
-            EstadoPresenca.FORA ->
-                if (dentroAproximacao) EstadoPresenca.CHEGANDO else EstadoPresenca.FORA
+            EstadoPresenca.FORA -> when {
+                dentroSaida -> EstadoPresenca.EM_CASA
+                dentroAproximacao && voltando -> EstadoPresenca.CHEGANDO
+                else -> EstadoPresenca.FORA
+            }
 
             EstadoPresenca.CHEGANDO ->
                 if (dentroSaida) EstadoPresenca.EM_CASA else EstadoPresenca.CHEGANDO

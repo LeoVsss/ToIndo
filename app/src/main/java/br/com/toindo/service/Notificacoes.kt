@@ -1,4 +1,4 @@
-package br.com.toindo.prototipo
+package br.com.toindo.service
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -14,18 +14,21 @@ import br.com.toindo.MainActivity
 import br.com.toindo.R
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Pedido de navegação vindo de uma notificação: abrir a tela de detalhe desta saída. */
+/** Pedido vindo de uma notificação: abrir o detalhe desta saída. */
 object PedidoAbrirSaida {
-    const val EXTRA = "prototipo_saida_id"
+    const val EXTRA = "toindo_saida_id"
     val pendente = MutableStateFlow<Long?>(null)
 }
 
-object NotificacaoPrototipo {
-    private const val CANAL = "prototipo_saidas"
+/**
+ * Notificações de saída/chegada (RF08). Ao tocar, abre o detalhe da saída, que lista
+ * exatamente quais dispositivos foram desligados (ou religados na volta).
+ */
+object Notificacoes {
+    private const val CANAL = "saidas_chegadas"
     private const val ID_SAIDA = 1001
     private const val ID_VOLTA = 1002
 
-    /** Notifica "Dispositivos desligados" ao sair do radar. Tocar abre o detalhe da saída. */
     fun saida(context: Context, saidaId: Long, desligados: List<String>, mantidos: List<String>, offline: List<String>) {
         val titulo = if (desligados.isEmpty()) "Você saiu de casa" else "Dispositivos desligados"
         val resumo = if (desligados.isEmpty()) "Nenhum dispositivo precisou ser desligado."
@@ -39,13 +42,18 @@ object NotificacaoPrototipo {
         enviar(context, ID_SAIDA, saidaId, titulo, resumo, detalhe)
     }
 
-    /** Notifica os dispositivos que ligaram sozinhos ao chegar. */
-    fun volta(context: Context, saidaId: Long, ligados: List<String>) {
-        if (ligados.isEmpty()) return
-        enviar(
-            context, ID_VOLTA, saidaId, "Dispositivos ligados", ligados.joinToString(", "),
-            "Ligados ao chegar: ${ligados.joinToString(", ")}.\nToque para ver os detalhes.",
-        )
+    fun volta(context: Context, saidaId: Long, ligados: List<String>, naoReligados: List<String>, offline: List<String>) {
+        val titulo = if (ligados.isEmpty()) "Você voltou para casa" else "Dispositivos ligados"
+        val resumo = if (ligados.isEmpty()) "Nenhum dispositivo precisou ser religado." else ligados.joinToString(", ")
+        val detalhe = buildString {
+            append(if (ligados.isEmpty()) "Nenhum dispositivo religado." else "Ligados de novo: ${ligados.joinToString(", ")}.")
+            if (naoReligados.isNotEmpty()) append("\nNão religados por segurança: ${naoReligados.joinToString(", ")}.")
+            if (offline.isNotEmpty()) append("\nOffline: ${offline.joinToString(", ")}.")
+            append("\nToque para ver os detalhes.")
+        }
+        // A notificação da saída sai da bandeja quando você volta.
+        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(ID_SAIDA)
+        enviar(context, ID_VOLTA, saidaId, titulo, resumo, detalhe)
     }
 
     private fun enviar(context: Context, notifId: Int, saidaId: Long, titulo: String, resumo: String, detalhe: String) {
@@ -67,15 +75,17 @@ object NotificacaoPrototipo {
         val pi = PendingIntent.getActivity(
             context, notifId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val n = NotificationCompat.Builder(context, CANAL)
-            .setSmallIcon(R.drawable.ic_logo)
-            .setContentTitle(titulo)
-            .setContentText(resumo)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(detalhe))
-            .setContentIntent(pi)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
-        gerenciador.notify(notifId, n)
+        gerenciador.notify(
+            notifId,
+            NotificationCompat.Builder(context, CANAL)
+                .setSmallIcon(R.drawable.ic_logo)
+                .setContentTitle(titulo)
+                .setContentText(resumo)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detalhe))
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .build(),
+        )
     }
 }

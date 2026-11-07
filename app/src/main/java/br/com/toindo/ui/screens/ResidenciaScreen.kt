@@ -77,14 +77,15 @@ data class ResidenciaUi(
     val longitude: Double,
     val raioSaidaM: Int,
     val raioAproximacaoM: Int,
-    val confirmacaoMin: Int,
+    /** Segundos fora do raio antes de confirmar a saída. */
+    val confirmacaoSeg: Int,
     val precisaoM: Int? = null,
 )
 
 class ResidenciaViewModel : ViewModel() {
     private val r = RepositorioToIndo.residencia.value
     private val _ui = MutableStateFlow(
-        ResidenciaUi(r.latitude, r.longitude, r.raioSaidaM, r.raioAproximacaoM, RepositorioToIndo.configuracao.value.tempoConfirmacaoSaidaMin)
+        ResidenciaUi(r.latitude, r.longitude, r.raioSaidaM, r.raioAproximacaoM, RepositorioToIndo.configuracao.value.tempoConfirmacaoSaidaSeg)
     )
     val ui = _ui.asStateFlow()
 
@@ -92,11 +93,16 @@ class ResidenciaViewModel : ViewModel() {
     fun raioSaida(m: Int) = _ui.update { it.copy(raioSaidaM = m, raioAproximacaoM = maxOf(it.raioAproximacaoM, m)) }
     /** RN02: aproximação nunca menor que a saída. */
     fun raioAproximacao(m: Int) = _ui.update { it.copy(raioAproximacaoM = maxOf(m, it.raioSaidaM)) }
-    fun confirmacao(delta: Int) = _ui.update { it.copy(confirmacaoMin = (it.confirmacaoMin + delta).coerceIn(1, 30)) }
+    /** Passa para a opção anterior/seguinte de [OPCOES_CONFIRMACAO_SEG]. */
+    fun confirmacao(delta: Int) = _ui.update {
+        val atual = OPCOES_CONFIRMACAO_SEG.indexOfFirst { op -> op >= it.confirmacaoSeg }
+            .let { i -> if (i < 0) OPCOES_CONFIRMACAO_SEG.lastIndex else i }
+        it.copy(confirmacaoSeg = OPCOES_CONFIRMACAO_SEG[(atual + delta).coerceIn(0, OPCOES_CONFIRMACAO_SEG.lastIndex)])
+    }
 
     fun salvar() {
         val u = _ui.value
-        RepositorioToIndo.salvarResidencia(Residencia("Casa", u.latitude, u.longitude, u.raioSaidaM, u.raioAproximacaoM), u.confirmacaoMin)
+        RepositorioToIndo.salvarResidencia(Residencia("Casa", u.latitude, u.longitude, u.raioSaidaM, u.raioAproximacaoM), u.confirmacaoSeg)
     }
 }
 
@@ -167,19 +173,19 @@ fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: Residenc
         }
 
         CardToIndo {
-            ControleRaio("Raio de saída", "${ui.raioSaidaM} m", ui.raioSaidaM.toFloat(), 100f..1000f, ToIndo.extras.presencaTexto) {
-                vm.raioSaida(((it / 50).toInt() * 50))
+            ControleRaio("Raio de saída", "${ui.raioSaidaM} m", ui.raioSaidaM.toFloat(), 5f..1000f, ToIndo.extras.presencaTexto) {
+                vm.raioSaida(arredondarRaio(it))
             }
             ControleRaio(
-                "Raio de aproximação", formatarDistancia(ui.raioAproximacaoM), ui.raioAproximacaoM.toFloat(), 500f..10000f,
+                "Raio de aproximação", formatarDistancia(ui.raioAproximacaoM), ui.raioAproximacaoM.toFloat(), 5f..5000f,
                 MaterialTheme.colorScheme.primary,
-            ) { vm.raioAproximacao(((it / 500).toInt() * 500)) }
+            ) { vm.raioAproximacao(arredondarRaio(it)) }
             Row(Modifier.fillMaxWidth().padding(top = Espaco.s), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Confirmar saída após", style = MaterialTheme.typography.titleSmall)
                     Text("Evita desligar por oscilação do GPS", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Stepper("${ui.confirmacaoMin} min", "tempo de confirmação", { vm.confirmacao(-1) }, { vm.confirmacao(+1) })
+                Stepper(formatarSegundos(ui.confirmacaoSeg), "tempo de confirmação", { vm.confirmacao(-1) }, { vm.confirmacao(+1) })
             }
         }
 
@@ -260,6 +266,18 @@ private fun MapaOffline(ui: ResidenciaUi) {
             title = "Casa"
         })
         m.controller.setCenter(casa)
+        // Zoom que enquadra o raio de aproximação (raios de 5 m precisam de zoom bem alto).
+        val r = ui.raioAproximacaoM
+        m.controller.setZoom(
+            when {
+                r <= 25 -> 20.0
+                r <= 60 -> 19.0
+                r <= 150 -> 18.0
+                r <= 400 -> 16.5
+                r <= 1500 -> 15.0
+                else -> 13.0
+            }
+        )
         m.invalidate()
     }
 }
@@ -321,3 +339,21 @@ fun formatarDistancia(m: Int): String = if (m >= 1000) {
     val km = m / 1000.0
     if (km % 1.0 == 0.0) "${km.toInt()} km" else "${"%.1f".format(km).replace('.', ',')} km"
 } else "$m m"
+
+/** Opções do tempo de confirmação da saída (segundos). Curtas para conseguir testar. */
+val OPCOES_CONFIRMACAO_SEG = listOf(0, 5, 10, 15, 30, 60, 120, 300, 600)
+
+fun formatarSegundos(s: Int): String = when {
+    s == 0 -> "imediato"
+    s < 60 -> "$s s"
+    s % 60 == 0 -> "${s / 60} min"
+    else -> "${s / 60} min ${s % 60} s"
+}
+
+/** Passo fino perto de 5 m (para testes) e mais grosso em distâncias grandes. */
+private fun arredondarRaio(v: Float): Int = when {
+    v < 50 -> (v / 5).toInt().coerceAtLeast(1) * 5
+    v < 200 -> (v / 10).toInt() * 10
+    v < 1000 -> (v / 50).toInt() * 50
+    else -> (v / 250).toInt() * 250
+}

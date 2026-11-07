@@ -41,7 +41,7 @@ fun Residencia.paraEntity() = ResidenciaEntity(
 
 fun ConfiguracaoEntity.paraDominio() = Configuracao(
     tarifaKwh = tarifaKwh,
-    tempoConfirmacaoSaidaMin = tempoConfirmacaoSaidaMin,
+    tempoConfirmacaoSaidaSeg = tempoConfirmacaoSaidaSeg,
     notificacoesAtivas = notificacoesAtivas,
     automacaoAtiva = automacaoAtiva,
 )
@@ -49,7 +49,7 @@ fun ConfiguracaoEntity.paraDominio() = Configuracao(
 fun Configuracao.paraEntity(cadastroConcluido: Boolean) = ConfiguracaoEntity(
     id = 1,
     tarifaKwh = tarifaKwh,
-    tempoConfirmacaoSaidaMin = tempoConfirmacaoSaidaMin,
+    tempoConfirmacaoSaidaSeg = tempoConfirmacaoSaidaSeg,
     notificacoesAtivas = notificacoesAtivas,
     automacaoAtiva = automacaoAtiva,
     cadastroConcluido = cadastroConcluido,
@@ -114,11 +114,13 @@ fun EventoEntity.paraDominio(): EventoObjeto {
 
 fun ConsumoAgrupado.paraDominio() = ConsumoObjeto(nome = nome, kWh = kWh, custo = custo)
 
-/** "Hoje" / "Ontem" / dd/MM para agrupar o histórico (T7). */
+/** "Hoje" / "Ontem" / dd/MM para agrupar o histórico (T7), no fuso do aparelho. */
 private fun rotuloDoDia(instanteMillis: Long): String {
+    val inicioHoje = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+    }.timeInMillis
     val umDia = 24L * 60 * 60 * 1000
-    val agora = System.currentTimeMillis()
-    val inicioHoje = agora - (agora % umDia)
     return when {
         instanteMillis >= inicioHoje -> "Hoje"
         instanteMillis >= inicioHoje - umDia -> "Ontem"

@@ -25,7 +25,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,9 +90,24 @@ fun InicioScreen(
     onAbrirObjeto: (Long) -> Unit,
     onAdicionar: () -> Unit,
     onAbrirHistorico: () -> Unit,
+    onAbrirSaidas: () -> Unit = {},
     vm: InicioViewModel = viewModel(),
 ) {
     val ui by vm.ui.collectAsStateWithLifecycle()
+    val inicioConfirmacao by RepositorioToIndo.inicioConfirmacao.collectAsStateWithLifecycle()
+    val config by RepositorioToIndo.configuracao.collectAsStateWithLifecycle()
+
+    // Contagem regressiva da confirmação de saída, atualizada a cada segundo.
+    var agora by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(ui.presenca) {
+        while (ui.presenca == EstadoPresenca.CONFIRMANDO_SAIDA) {
+            agora = System.currentTimeMillis()
+            delay(1_000)
+        }
+    }
+    val segundosRestantes = inicioConfirmacao?.let {
+        (config.tempoConfirmacaoSaidaSeg - ((agora - it) / 1000)).toInt().coerceAtLeast(0)
+    }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Espaco.margem, vertical = Espaco.l),
@@ -101,7 +121,8 @@ fun InicioScreen(
             LogoToIndo(32.dp)
         }
 
-        PilulaPresenca(ui.presenca, ui.automacaoAtiva)
+        PilulaPresenca(ui.presenca, ui.automacaoAtiva, segundosRestantes)
+        PainelRadar()
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             Text("Seus objetos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -127,7 +148,57 @@ fun InicioScreen(
             }
         }
 
-        UltimoEvento(onAbrirHistorico)
+        UltimaSaida(onAbrirSaidas)
+    }
+}
+
+/** Distância até a casa, raio e qualidade do GPS — o "radar" visível na tela inicial. */
+@Composable
+private fun PainelRadar() {
+    val distancia by RepositorioToIndo.distanciaM.collectAsStateWithLifecycle()
+    val precisao by RepositorioToIndo.precisaoM.collectAsStateWithLifecycle()
+    val casa by RepositorioToIndo.residencia.collectAsStateWithLifecycle()
+
+    val texto = when {
+        distancia == null && precisao == null -> "Procurando sinal de GPS..."
+        precisao != null && precisao!! > RepositorioToIndo.PRECISAO_MAX_M ->
+            "GPS impreciso (±${precisao} m) — vá para perto de uma janela"
+        distancia != null -> "Você está a ${distancia!!.toInt()} m de casa · radar de ${casa.raioSaidaM} m"
+        else -> "Aguardando leitura precisa do GPS..."
+    }
+    Text(
+        texto + (precisao?.takeIf { it <= RepositorioToIndo.PRECISAO_MAX_M }?.let { " · GPS ±$it m" } ?: ""),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Última saída real (ou convite para testar, se ainda não houver nenhuma). */
+@Composable
+private fun UltimaSaida(onClick: () -> Unit) {
+    val saidas by RepositorioToIndo.saidas.collectAsStateWithLifecycle()
+    val ultima = saidas.firstOrNull()
+    val hora = remember { java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("pt", "BR")) }
+
+    val (titulo, detalhe) = if (ultima == null) {
+        "Nenhuma saída registrada" to "Afaste-se de casa com o celular para testar o radar"
+    } else {
+        val desligados = ultima.itens.count { it.naSaida == br.com.toindo.data.local.ResultadoSaida.DESLIGOU }
+        "$desligados objeto(s) desligado(s) em ${hora.format(java.util.Date(ultima.saida.saiuEmMillis))}" to
+            "Você saiu de casa ${saidas.size} ${if (saidas.size == 1) "vez" else "vezes"} · ver histórico de saídas"
+    }
+
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.m)) {
+            Box(Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.PowerSettingsNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(titulo, style = MaterialTheme.typography.titleSmall)
+                Text(detalhe, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -144,20 +215,4 @@ private fun ChipComodo(texto: String, selecionado: Boolean, onClick: () -> Unit)
             containerColor = MaterialTheme.colorScheme.surface,
         ),
     )
-}
-
-@Composable
-private fun UltimoEvento(onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.m)) {
-            Box(Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.PowerSettingsNew, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text("3 objetos desligados às 08:15", style = MaterialTheme.typography.titleSmall)
-                Text("Você saiu de casa · hoje 2,4 kWh, R$ 1,90 estimado", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
 }

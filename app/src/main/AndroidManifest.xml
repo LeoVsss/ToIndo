@@ -35,11 +35,5 @@
             android:name=".service.PresencaService"
             android:exported="false"
             android:foregroundServiceType="location" />
-
-        <!-- Protótipo: GPS real alimentando o simulador de presença -->
-        <service
-            android:name=".prototipo.PrototipoGpsService"
-            android:exported="false"
-            android:foregroundServiceType="location" />
     </application>
 </manifest>
