@@ -8,10 +8,6 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
-/**
- * Monta o Retrofit (RNF03: HTTPS + espaço para interceptor de autenticação).
- * Isolado aqui para o container de DX trocar entre serviço real e mock facilmente.
- */
 object Rede {
 
     fun criarApi(): ToIndoApi {
@@ -19,7 +15,6 @@ object Rede {
 
         val cliente = OkHttpClient.Builder()
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC })
-            // TODO (produção): addInterceptor { token de autenticação no header } — RNF03.
             .build()
 
         return Retrofit.Builder()

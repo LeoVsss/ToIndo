@@ -77,7 +77,6 @@ data class ResidenciaUi(
     val longitude: Double,
     val raioSaidaM: Int,
     val raioAproximacaoM: Int,
-    /** Segundos fora do raio antes de confirmar a saída. */
     val confirmacaoSeg: Int,
     val precisaoM: Int? = null,
 )
@@ -91,9 +90,7 @@ class ResidenciaViewModel : ViewModel() {
 
     fun posicao(lat: Double, lon: Double, precisao: Int?) = _ui.update { it.copy(latitude = lat, longitude = lon, precisaoM = precisao) }
     fun raioSaida(m: Int) = _ui.update { it.copy(raioSaidaM = m, raioAproximacaoM = maxOf(it.raioAproximacaoM, m)) }
-    /** RN02: aproximação nunca menor que a saída. */
     fun raioAproximacao(m: Int) = _ui.update { it.copy(raioAproximacaoM = maxOf(m, it.raioSaidaM)) }
-    /** Passa para a opção anterior/seguinte de [OPCOES_CONFIRMACAO_SEG]. */
     fun confirmacao(delta: Int) = _ui.update {
         val atual = OPCOES_CONFIRMACAO_SEG.indexOfFirst { op -> op >= it.confirmacaoSeg }
             .let { i -> if (i < 0) OPCOES_CONFIRMACAO_SEG.lastIndex else i }
@@ -106,7 +103,6 @@ class ResidenciaViewModel : ViewModel() {
     }
 }
 
-/** T2 — Cadastro da residência (US06, RF01, RN01, RN02). Mapa e GPS funcionam sem internet. */
 @Composable
 fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: ResidenciaViewModel = viewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -114,7 +110,6 @@ fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: Residenc
     val semInternet = remember { !temInternet(context) }
     val editando = RepositorioToIndo.cadastroConcluido.value
 
-    // Pede uma leitura ativa de GPS; se faltar permissão, o launcher abaixo solicita e repete.
     fun capturarLocalizacao() {
         obterLocalizacaoAtual(
             context = context,
@@ -225,11 +220,6 @@ private fun Selo(texto: String, ponto: Color, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Mapa OpenStreetMap (osmdroid). Os tiles ficam em cache no aparelho; para garantir a área da casa
- * sem internet, baixe a região uma vez no cadastro com org.osmdroid.tileprovider.cachemanager.CacheManager
- * (downloadAreaAsync com o retângulo do raio de aproximação, zoom 13 a 18).
- */
 @Composable
 private fun MapaOffline(ui: ResidenciaUi) {
     val context = LocalContext.current
@@ -266,7 +256,6 @@ private fun MapaOffline(ui: ResidenciaUi) {
             title = "Casa"
         })
         m.controller.setCenter(casa)
-        // Zoom que enquadra o raio de aproximação (raios de 5 m precisam de zoom bem alto).
         val r = ui.raioAproximacaoM
         m.controller.setZoom(
             when {
@@ -286,11 +275,6 @@ private fun temPermissaoLoc(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-/**
- * Obtém a posição atual do aparelho de forma ATIVA (não só o último fix em cache).
- * Usa o FusedLocationProviderClient (GPS + rede/WiFi). Chama [onSucesso] com lat/lon/precisão
- * ou [onFalha] com uma mensagem amigável. Requer permissão já concedida.
- */
 @SuppressLint("MissingPermission")
 private fun obterLocalizacaoAtual(
     context: Context,
@@ -301,7 +285,6 @@ private fun obterLocalizacaoAtual(
         onFalha("Permissão de localização necessária.")
         return
     }
-    // Avisa se o GPS/localização do sistema estiver desligado.
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     val ligado = lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
     if (!ligado) {
@@ -317,7 +300,6 @@ private fun obterLocalizacaoAtual(
             if (loc != null) {
                 onSucesso(loc.latitude, loc.longitude, if (loc.hasAccuracy()) loc.accuracy.toInt() else null)
             } else {
-                // Fallback: último fix conhecido, caso o fix ativo volte nulo.
                 cliente.lastLocation
                     .addOnSuccessListener { ultima ->
                         if (ultima != null) onSucesso(ultima.latitude, ultima.longitude, if (ultima.hasAccuracy()) ultima.accuracy.toInt() else null)
@@ -340,7 +322,6 @@ fun formatarDistancia(m: Int): String = if (m >= 1000) {
     if (km % 1.0 == 0.0) "${km.toInt()} km" else "${"%.1f".format(km).replace('.', ',')} km"
 } else "$m m"
 
-/** Opções do tempo de confirmação da saída (segundos). Curtas para conseguir testar. */
 val OPCOES_CONFIRMACAO_SEG = listOf(0, 5, 10, 15, 30, 60, 120, 300, 600)
 
 fun formatarSegundos(s: Int): String = when {
@@ -350,7 +331,6 @@ fun formatarSegundos(s: Int): String = when {
     else -> "${s / 60} min ${s % 60} s"
 }
 
-/** Passo fino perto de 5 m (para testes) e mais grosso em distâncias grandes. */
 private fun arredondarRaio(v: Float): Int = when {
     v < 50 -> (v / 5).toInt().coerceAtLeast(1) * 5
     v < 200 -> (v / 10).toInt() * 10

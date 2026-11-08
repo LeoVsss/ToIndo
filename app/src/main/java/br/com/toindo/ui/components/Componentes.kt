@@ -62,7 +62,6 @@ import br.com.toindo.model.Controle
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
 
-/** Ícone Material Symbols Rounded de cada tipo de objeto. */
 fun TipoObjeto.icone(): ImageVector = when (this) {
     TipoObjeto.AR_CONDICIONADO -> Icons.Rounded.AcUnit
     TipoObjeto.FORNO -> Icons.Rounded.Microwave
@@ -74,7 +73,6 @@ fun TipoObjeto.icone(): ImageVector = when (this) {
     TipoObjeto.OUTRO -> Icons.Rounded.DevicesOther
 }
 
-/** Valor curto mostrado no cartão (ex.: "180°"). */
 fun ObjetoInteligente.destaque(): String? = when {
     !ligado -> null
     tipo == TipoObjeto.GELADEIRA -> "sempre ligada"
@@ -88,7 +86,6 @@ fun LogoToIndo(tamanho: Dp = 28.dp) {
     Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(tamanho))
 }
 
-/** Card branco de 24 dp, base de quase todas as seções. */
 @Composable
 fun CardToIndo(
     modifier: Modifier = Modifier,
@@ -144,7 +141,6 @@ fun RotuloDeSecao(texto: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Pílula de presença: estado da automação visível sem toque (princípio 1). */
 @Composable
 fun PilulaPresenca(estado: EstadoPresenca, automacaoAtiva: Boolean, segundosRestantes: Int? = null) {
     val (texto, cor) = when (estado) {
@@ -177,7 +173,6 @@ fun PilulaPresenca(estado: EstadoPresenca, automacaoAtiva: Boolean, segundosRest
     }
 }
 
-/** Chip Manual / Automático (princípio 2: automação explicável). */
 @Composable
 fun ChipOrigem(origem: OrigemEvento) {
     val automatico = origem == OrigemEvento.AUTOMATICO
@@ -192,7 +187,6 @@ fun ChipOrigem(origem: OrigemEvento) {
     )
 }
 
-/** Rótulo obrigatório em todo valor de kWh e R$ (princípio 3, RN04). */
 @Composable
 fun SeloEstimado() {
     Text(
@@ -206,7 +200,6 @@ fun SeloEstimado() {
     )
 }
 
-/** Seletor − valor + com alvos de 44 dp. */
 @Composable
 fun Stepper(valor: String, rotulo: String, onMenos: () -> Unit, onMais: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.xs)) {
@@ -226,7 +219,6 @@ fun Stepper(valor: String, rotulo: String, onMenos: () -> Unit, onMais: () -> Un
     }
 }
 
-/** Cartão de um objeto na Início. Ligado = fundo Névoa. */
 @Composable
 fun CartaoObjeto(objeto: ObjetoInteligente, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val ligado = objeto.ligado
@@ -288,7 +280,6 @@ fun CartaoAdicionar(onClick: () -> Unit, modifier: Modifier = Modifier) {
     }
 }
 
-/** Linha de lista dentro de card (Ajustes, regras, consumo por objeto). */
 @Composable
 fun LinhaDeLista(
     rotulo: String,
@@ -322,7 +313,6 @@ fun LinhaDeLista(
     }
 }
 
-/** Faixa de aviso (âmbar = atenção, Névoa = informação, verde = ok). */
 @Composable
 fun Faixa(texto: String, icone: ImageVector, fundo: Color, tinta: Color, modifier: Modifier = Modifier) {
     Row(

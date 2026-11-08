@@ -70,7 +70,6 @@ interface RegistroConsumoDao {
     @Insert
     suspend fun inserir(registro: RegistroConsumoEntity)
 
-    /** Agregado de kWh e custo por objeto a partir de um instante (para US04 por período). */
     @Query(
         "SELECT objetoNome AS nome, SUM(kWh) AS kWh, SUM(custo) AS custo " +
             "FROM registros_consumo WHERE fimMillis >= :desdeMillis " +
@@ -78,16 +77,13 @@ interface RegistroConsumoDao {
     )
     fun observarPorObjetoDesde(desdeMillis: Long): Flow<List<ConsumoAgrupado>>
 
-    /** kWh total por dia (epoch do início do dia local é calculado na camada de domínio). */
     @Query("SELECT inicioMillis, fimMillis, kWh FROM registros_consumo WHERE fimMillis >= :desdeMillis")
     fun observarIntervalosDesde(desdeMillis: Long): Flow<List<IntervaloConsumo>>
 
-    /** Todos os intervalos fechados a partir de um instante (tela de Consumo agrega por período). */
     @Query("SELECT * FROM registros_consumo WHERE fimMillis >= :desdeMillis ORDER BY fimMillis")
     fun observarDesde(desdeMillis: Long): Flow<List<RegistroConsumoEntity>>
 }
 
-/** Projeções de consulta (não são tabelas). */
 data class ConsumoAgrupado(val nome: String, val kWh: Double, val custo: Double)
 data class IntervaloConsumo(val inicioMillis: Long, val fimMillis: Long, val kWh: Double)
 
@@ -100,7 +96,6 @@ interface PresencaDao {
     suspend fun salvar(p: PresencaEntity)
 }
 
-/** Saída + o que aconteceu com cada dispositivo. */
 data class SaidaComItens(
     @androidx.room.Embedded val saida: SaidaEntity,
     @androidx.room.Relation(parentColumn = "id", entityColumn = "saidaId") val itens: List<SaidaItemEntity>,

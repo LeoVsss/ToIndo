@@ -14,16 +14,11 @@ import br.com.toindo.MainActivity
 import br.com.toindo.R
 import kotlinx.coroutines.flow.MutableStateFlow
 
-/** Pedido vindo de uma notificação: abrir o detalhe desta saída. */
 object PedidoAbrirSaida {
     const val EXTRA = "toindo_saida_id"
     val pendente = MutableStateFlow<Long?>(null)
 }
 
-/**
- * Notificações de saída/chegada (RF08). Ao tocar, abre o detalhe da saída, que lista
- * exatamente quais dispositivos foram desligados (ou religados na volta).
- */
 object Notificacoes {
     private const val CANAL = "saidas_chegadas"
     private const val ID_SAIDA = 1001
@@ -51,7 +46,6 @@ object Notificacoes {
             if (offline.isNotEmpty()) append("\nOffline: ${offline.joinToString(", ")}.")
             append("\nToque para ver os detalhes.")
         }
-        // A notificação da saída sai da bandeja quando você volta.
         (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(ID_SAIDA)
         enviar(context, ID_VOLTA, saidaId, titulo, resumo, detalhe)
     }

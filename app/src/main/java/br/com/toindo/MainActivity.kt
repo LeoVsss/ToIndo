@@ -17,7 +17,6 @@ import br.com.toindo.ui.theme.ToIndoTheme
 
 class MainActivity : ComponentActivity() {
 
-    /** Pede localização precisa (GPS) e notificações juntos; com o GPS liberado, inicia o monitoramento. */
     private val pedirPermissoes = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         iniciarMonitoramentoSePuder()
     }
@@ -58,7 +57,6 @@ class MainActivity : ComponentActivity() {
         if (faltam.isNotEmpty()) pedirPermissoes.launch(faltam.toTypedArray())
     }
 
-    /** Liga a automação por presença (RF03–RF05) — exige localização PRECISA (GPS). */
     private fun iniciarMonitoramentoSePuder() {
         if (tem(Manifest.permission.ACCESS_FINE_LOCATION)) PresencaService.iniciar(this)
     }
@@ -66,7 +64,6 @@ class MainActivity : ComponentActivity() {
     private fun tem(permissao: String) =
         ContextCompat.checkSelfPermission(this, permissao) == PackageManager.PERMISSION_GRANTED
 
-    /** Notificação "Dispositivos desligados/ligados" pede para abrir o detalhe da saída. */
     private fun lerPedidoDeNotificacao(intent: Intent?) {
         val id = intent?.getLongExtra(PedidoAbrirSaida.EXTRA, 0L) ?: 0L
         if (id != 0L) {

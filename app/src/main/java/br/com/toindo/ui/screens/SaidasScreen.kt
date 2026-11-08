@@ -34,7 +34,6 @@ import java.util.Locale
 private val formatoDataHora = SimpleDateFormat("dd/MM 'às' HH:mm:ss", Locale("pt", "BR"))
 private fun quando(millis: Long) = formatoDataHora.format(Date(millis))
 
-/** Duração legível entre a saída e a volta. */
 private fun duracao(s: SaidaComItens): String? {
     val volta = s.saida.voltouEmMillis ?: return null
     val seg = (volta - s.saida.saiuEmMillis) / 1000
@@ -55,7 +54,6 @@ private fun textoVolta(r: String?) = when (r) {
     else -> r
 }
 
-/** Histórico de saídas: quantas vezes você saiu e o resumo de cada uma. */
 @Composable
 fun SaidasScreen(onVoltar: () -> Unit, onAbrirSaida: (Long) -> Unit) {
     val saidas by RepositorioToIndo.saidas.collectAsStateWithLifecycle()
@@ -103,7 +101,6 @@ fun SaidasScreen(onVoltar: () -> Unit, onAbrirSaida: (Long) -> Unit) {
     }
 }
 
-/** Detalhe de uma saída: o que aconteceu com cada dispositivo ao sair e ao voltar. */
 @Composable
 fun SaidaDetalheScreen(saidaId: Long, onVoltar: () -> Unit) {
     val dados by remember(saidaId) { RepositorioToIndo.saida(saidaId) }.collectAsStateWithLifecycle(null)

@@ -24,14 +24,6 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 
-/**
- * Serviço em primeiro plano que lê o GPS REAL do celular e repassa cada posição ao
- * [RepositorioToIndo.avaliarPosicao], que decide se você saiu/voltou e aplica a automação.
- *
- * Protótipo: GPS de alta precisão a cada ~3 s, para conseguir testar com raios pequenos
- * (a partir de 5 m). O custo é bateria; a evolução é usar geofencing (seção 6 do PLAN).
- * Continua funcionando com a tela apagada e o app em segundo plano (notificação fixa).
- */
 class PresencaService : Service() {
 
     private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }

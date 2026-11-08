@@ -57,7 +57,6 @@ class DetalheObjetoViewModel : ViewModel() {
         RepositorioToIndo.definirAcoes(o.id, aoSair, aoChegar)
 }
 
-/** T5 — Detalhe do objeto (US03, US05, RF06, RN03). Controles variam conforme o tipo. */
 @Composable
 fun DetalheObjetoScreen(id: Long, onVoltar: () -> Unit, onEditar: () -> Unit, vm: DetalheObjetoViewModel = viewModel()) {
     val objetos by vm.objetos.collectAsStateWithLifecycle()

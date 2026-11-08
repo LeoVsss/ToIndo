@@ -44,7 +44,6 @@ import br.com.toindo.ui.components.CardToIndo
 import br.com.toindo.ui.components.LogoToIndo
 import br.com.toindo.ui.theme.Espaco
 
-/** T1 — Boas-vindas e permissões (US01, US02, RF03, RNF01, RNF02). */
 @Composable
 fun BoasVindasScreen(onContinuar: () -> Unit) {
     val permissoes = buildList {
@@ -52,8 +51,6 @@ fun BoasVindasScreen(onContinuar: () -> Unit) {
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
-    // A localização "o tempo todo" (ACCESS_BACKGROUND_LOCATION) precisa ser pedida depois,
-    // em um segundo passo, como o Android exige a partir da versão 11.
     val pedir = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onContinuar() }
 
     Column(
@@ -84,7 +81,7 @@ fun BoasVindasScreen(onContinuar: () -> Unit) {
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             BotaoPrincipal("Permitir e continuar", onClick = { pedir.launch(permissoes) })
-            TextButton(onClick = { /* abrir política de privacidade */ }) { Text("Ver política de privacidade") }
+            TextButton(onClick = {  }) { Text("Ver política de privacidade") }
         }
     }
 }
@@ -101,7 +98,6 @@ private fun ItemPermissao(icone: ImageVector, titulo: String, texto: String, ult
     if (!ultimo) Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
 }
 
-/** Casa no centro de dois raios: saída (preenchido) e aproximação (tracejado). */
 @Composable
 private fun IlustracaoRaios() {
     val primaria = MaterialTheme.colorScheme.primary

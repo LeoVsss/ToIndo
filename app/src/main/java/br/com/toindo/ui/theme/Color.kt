@@ -2,17 +2,15 @@ package br.com.toindo.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta do documento da fase Design (seção 2). Claro / escuro.
-
 val AzulToIndo = Color(0xFF2451E6)
 val AzulToIndoEscuro = Color(0xFF8FA8FF)
 val Nevoa = Color(0xFFDCE4FF)
 val NevoaEscuro = Color(0xFF1C2C66)
-val NevoaTinta = Color(0xFF1C2C66) // texto sobre Névoa
+val NevoaTinta = Color(0xFF1C2C66)
 
 val Frescor = Color(0xFF12A4B8)
 val FrescorEscuro = Color(0xFF4FD0E0)
-val FrescorTexto = Color(0xFF0B6B79) // versão AA para texto sobre branco
+val FrescorTexto = Color(0xFF0B6B79)
 
 val AmbarEnergia = Color(0xFFE8962E)
 val AmbarEnergiaEscuro = Color(0xFFF5B562)
@@ -38,4 +36,4 @@ val TintaSuave = Color(0xFF5A6578)
 val TintaSuaveEscuro = Color(0xFF9AA6BA)
 val Contorno = Color(0xFFD5DBE4)
 val ContornoEscuro = Color(0xFF2A3447)
-val Trilho = Color(0xFFE6EBF1) // fundo de trilhos, segmentos e mapa
+val Trilho = Color(0xFFE6EBF1)

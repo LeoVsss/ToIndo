@@ -16,8 +16,6 @@ android {
         versionCode = 1
         versionName = "0.2-prototype"
 
-        // Endereço base do servidor que simula/comanda o ar-condicionado (RNF03: HTTPS em produção).
-        // Pode ser trocado por um mock local sem alterar o código das telas.
         buildConfigField("String", "URL_BASE_API", "\"https://toindo.mock/\"")
     }
 
@@ -57,25 +55,20 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Mapa que funciona sem internet (tiles salvos no aparelho) — ver seção 8 do documento
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 
-    // --- Fase Prototype: persistência local (Room) ---
     val room = "2.6.1"
     implementation("androidx.room:room-runtime:$room")
     implementation("androidx.room:room-ktx:$room")
     ksp("androidx.room:room-compiler:$room")
 
-    // --- Fase Prototype: comando remoto do objeto (Retrofit + OkHttp + Moshi), RNF03 ---
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
 
-    // --- Fase Prototype: localização/geofencing (automação por proximidade), RNF01 ---
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
-    // Coroutines (StateFlow/Flow já são usados pelas telas)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

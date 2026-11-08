@@ -12,18 +12,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import br.com.toindo.R
 
-/** Inter: textos, rótulos e números pequenos (vem embutida em res/font). */
 val Inter = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),
     Font(R.font.inter_medium, FontWeight.Medium),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
 )
 
-/**
- * Space Grotesk: títulos e números grandes (temperatura, kWh).
- * Adicione res/font/space_grotesk_medium.ttf pelo Android Studio (README).
- * Enquanto o arquivo não existir, o app usa a Inter, sem quebrar a compilação.
- */
 @SuppressLint("DiscouragedApi")
 @Composable
 fun rememberFonteDisplay(): FontFamily {

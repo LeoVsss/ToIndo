@@ -7,10 +7,6 @@ import br.com.toindo.model.OrigemEvento
 import br.com.toindo.model.TipoEvento
 import br.com.toindo.model.TipoObjeto
 
-/**
- * Converte os tipos do domínio que o SQLite não guarda nativamente.
- * Enums viram o próprio `name` (estável e legível); o mapa de parâmetros vira "CHAVE=valor;...".
- */
 class Converters {
 
     @TypeConverter fun tipoObjetoToString(v: TipoObjeto?): String? = v?.name

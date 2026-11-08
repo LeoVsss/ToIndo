@@ -68,10 +68,6 @@ class ConsumoViewModel : ViewModel() {
     val periodo = _periodo.asStateFlow()
     fun escolher(p: Periodo) { _periodo.value = p }
 
-    /**
-     * Tudo calculado dos registros REAIS do Room (intervalos ligado->desligado fechados) e
-     * do histórico de saídas. Sem dados, mostra zero — nada de números de exemplo.
-     */
     val ui: StateFlow<ConsumoUi> = combine(
         _periodo, RepositorioToIndo.registrosConsumo, RepositorioToIndo.saidas, RepositorioToIndo.configuracao,
     ) { p, registros, saidas, config ->
@@ -81,7 +77,6 @@ class ConsumoViewModel : ViewModel() {
             .map { (nome, l) -> ConsumoObjeto(nome, l.sumOf { it.kWh }, l.sumOf { it.custo }) }
             .sortedByDescending { it.kWh }
 
-        // Economia = o que os objetos desligados pela automação teriam gastado enquanto você estava fora.
         val agora = System.currentTimeMillis()
         val kWhEvitado = saidas.filter { it.saida.saiuEmMillis >= desde }.sumOf { s ->
             val fim = s.saida.voltouEmMillis ?: agora
@@ -112,7 +107,6 @@ class ConsumoViewModel : ViewModel() {
         return c.timeInMillis
     }
 
-    /** kWh por dia local (fuso do aparelho) dos últimos 7 dias, para o gráfico. */
     private fun ultimosSeteDias(registros: List<RegistroConsumoEntity>): Pair<List<String>, List<Double>> {
         val nomes = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
         val rotulos = mutableListOf<String>()
@@ -143,7 +137,6 @@ data class ConsumoUi(
 fun Double.brl(): String = "R$ " + "%.2f".format(this).replace('.', ',')
 fun Double.kwh(): String = "%.1f".format(this).replace('.', ',') + " kWh"
 
-/** T6 — Consumo estimado (US04, RF08, RN04). */
 @Composable
 fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
     val periodo by vm.periodo.collectAsStateWithLifecycle()
@@ -184,7 +177,6 @@ fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
             }
         }
 
-        // Princípio 3: a fórmula da estimativa sempre acessível.
         CardToIndo(padding = Espaco.l) {
             Row(
                 Modifier.fillMaxWidth().clickable(role = Role.Button) { formulaAberta = !formulaAberta },

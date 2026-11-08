@@ -4,24 +4,10 @@ import br.com.toindo.model.AcaoPresenca
 import br.com.toindo.model.EstadoPresenca
 import br.com.toindo.model.ObjetoInteligente
 
-/**
- * Regras puras da automação por presença (seção 5 — máquina de estados; RN01–RN05).
- * Sem dependência de Android/Room: recebe fatos, devolve decisões. Fácil de testar.
- */
 object MotorAutomacao {
 
-    /** O que fazer com um objeto numa transição de presença. */
     enum class Decisao { LIGAR, DESLIGAR, MANTER }
 
-    /**
-     * Calcula o novo estado de presença a partir da distância do morador até a casa.
-     * - Sai do raio de saída -> começa a confirmar (RN01).
-     * - Fica fora do raio de saída por >= tempoConfirmacao -> FORA.
-     * - Volta para dentro do raio de saída -> EM_CASA (religa o que foi desligado).
-     * - Estando FORA, entra no raio de aproximação E está de fato voltando -> CHEGANDO (RN02).
-     *   "Voltando" = chegou pelo menos [margemVoltaM] mais perto que o ponto mais distante.
-     *   Sem isso, sair e parar a poucos metros (ainda dentro da aproximação) já contava como chegada.
-     */
     fun proximaPresenca(
         atual: EstadoPresenca,
         distanciaM: Double,
@@ -42,7 +28,7 @@ object MotorAutomacao {
                 if (!dentroSaida) EstadoPresenca.CONFIRMANDO_SAIDA else EstadoPresenca.EM_CASA
 
             EstadoPresenca.CONFIRMANDO_SAIDA -> when {
-                dentroSaida -> EstadoPresenca.EM_CASA // voltou: oscilação de GPS (RN01)
+                dentroSaida -> EstadoPresenca.EM_CASA
                 inicioConfirmacaoMillis != null &&
                     agoraMillis - inicioConfirmacaoMillis >= tempoConfirmacaoSeg * 1_000L -> EstadoPresenca.FORA
                 else -> EstadoPresenca.CONFIRMANDO_SAIDA
@@ -59,11 +45,6 @@ object MotorAutomacao {
         }
     }
 
-    /**
-     * Decide a ação para um objeto quando a presença muda.
-     * Respeita: automação global, `automacaoPausada` (RN03), e as regras de segurança do tipo
-     * (forno/torradeira não ligam sozinhos; geladeira nunca desliga sozinha).
-     */
     fun decidir(
         objeto: ObjetoInteligente,
         de: EstadoPresenca,
@@ -71,7 +52,7 @@ object MotorAutomacao {
         automacaoGlobalAtiva: Boolean,
     ): Decisao {
         if (!automacaoGlobalAtiva) return Decisao.MANTER
-        if (objeto.automacaoPausada) return Decisao.MANTER // RN03
+        if (objeto.automacaoPausada) return Decisao.MANTER
 
         val saiu = para == EstadoPresenca.FORA && de != EstadoPresenca.FORA
         val chegando = para == EstadoPresenca.CHEGANDO && de == EstadoPresenca.FORA
@@ -89,7 +70,6 @@ object MotorAutomacao {
         }
     }
 
-    /** Uma transição EM_CASA/FORA limpa a pausa manual (RN03: "até a próxima transição"). */
     fun deveLimparPausa(de: EstadoPresenca, para: EstadoPresenca): Boolean =
         (para == EstadoPresenca.FORA && de != EstadoPresenca.FORA) ||
             (para == EstadoPresenca.EM_CASA && de != EstadoPresenca.EM_CASA)

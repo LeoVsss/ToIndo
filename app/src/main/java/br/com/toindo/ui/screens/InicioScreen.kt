@@ -84,7 +84,6 @@ class InicioViewModel : ViewModel() {
     fun filtrar(comodo: String?) = filtro.update { comodo }
 }
 
-/** T4 — Início (US01, US02, US05, RF03–RF05, RN05). */
 @Composable
 fun InicioScreen(
     onAbrirObjeto: (Long) -> Unit,
@@ -97,7 +96,6 @@ fun InicioScreen(
     val inicioConfirmacao by RepositorioToIndo.inicioConfirmacao.collectAsStateWithLifecycle()
     val config by RepositorioToIndo.configuracao.collectAsStateWithLifecycle()
 
-    // Contagem regressiva da confirmação de saída, atualizada a cada segundo.
     var agora by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(ui.presenca) {
         while (ui.presenca == EstadoPresenca.CONFIRMANDO_SAIDA) {
@@ -134,7 +132,6 @@ fun InicioScreen(
             ui.comodos.forEach { c -> ChipComodo(c, ui.filtro == c) { vm.filtrar(c) } }
         }
 
-        // Grade de 2 colunas; o último espaço é sempre "Adicionar objeto".
         val celulas: List<ObjetoInteligente?> = ui.objetos + listOf(null)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             celulas.chunked(2).forEach { linha ->
@@ -152,7 +149,6 @@ fun InicioScreen(
     }
 }
 
-/** Distância até a casa, raio e qualidade do GPS — o "radar" visível na tela inicial. */
 @Composable
 private fun PainelRadar() {
     val distancia by RepositorioToIndo.distanciaM.collectAsStateWithLifecycle()
@@ -173,7 +169,6 @@ private fun PainelRadar() {
     )
 }
 
-/** Última saída real (ou convite para testar, se ainda não houver nenhuma). */
 @Composable
 private fun UltimaSaida(onClick: () -> Unit) {
     val saidas by RepositorioToIndo.saidas.collectAsStateWithLifecycle()

@@ -1,7 +1,5 @@
 package br.com.toindo.model
 
-/** Seção 6 e 7 do documento: domínio do Tô indo!. */
-
 enum class EstadoDispositivo { LIGADO, DESLIGADO, INDISPONIVEL }
 
 enum class EstadoPresenca { EM_CASA, CONFIRMANDO_SAIDA, FORA, CHEGANDO }
@@ -14,7 +12,6 @@ enum class OrigemEvento(val rotulo: String) { MANUAL("Manual"), AUTOMATICO("Auto
 
 enum class TipoEvento { LIGOU, DESLIGOU, AJUSTOU }
 
-/** Controles que um tipo de objeto oferece na tela de detalhe. */
 enum class Controle(val rotulo: String, val unidade: String, val min: Int, val max: Int, val passo: Int) {
     TEMPERATURA("Temperatura", "°C", 16, 250, 1),
     TIMER("Timer", "min", 0, 180, 5),
@@ -23,19 +20,13 @@ enum class Controle(val rotulo: String, val unidade: String, val min: Int, val m
     CANAL("Canal", "", 1, 999, 1),
 }
 
-/**
- * Cada tipo carrega suas capacidades e padrões (tabela "Tipos de objeto" da seção 4).
- * Um tipo novo é só uma linha aqui.
- */
 enum class TipoObjeto(
     val rotulo: String,
     val rotuloCurto: String,
     val controles: List<Controle>,
     val aoSairPadrao: AcaoPresenca,
     val aoChegarPadrao: AcaoPresenca,
-    /** Regra de segurança: objetos que aquecem nunca ligam sozinhos. */
     val podeLigarSozinho: Boolean,
-    /** Geladeira: a automação nunca desliga. */
     val podeDesligarSozinho: Boolean = true,
 ) {
     AR_CONDICIONADO("Ar-condicionado", "Ar-cond.", listOf(Controle.TEMPERATURA), AcaoPresenca.DESLIGAR, AcaoPresenca.LIGAR, true),
@@ -47,7 +38,6 @@ enum class TipoObjeto(
     TOMADA("Tomada", "Tomada", emptyList(), AcaoPresenca.DESLIGAR, AcaoPresenca.NADA, true),
     OUTRO("Outro", "Outro", emptyList(), AcaoPresenca.DESLIGAR, AcaoPresenca.NADA, true);
 
-    /** Ações permitidas ao chegar, respeitando a regra de segurança. */
     val acoesAoChegar: List<AcaoPresenca>
         get() = if (podeLigarSozinho) listOf(AcaoPresenca.LIGAR, AcaoPresenca.NADA) else listOf(AcaoPresenca.NADA)
 
@@ -96,7 +86,6 @@ data class ConsumoObjeto(val nome: String, val kWh: Double, val custo: Double)
 
 data class Configuracao(
     val tarifaKwh: Double = 0.79,
-    /** Segundos fora do raio antes de confirmar a saída (anti-oscilação do GPS). 0 = imediato. */
     val tempoConfirmacaoSaidaSeg: Int = 10,
     val notificacoesAtivas: Boolean = true,
     val automacaoAtiva: Boolean = true,

@@ -66,7 +66,6 @@ class HistoricoViewModel : ViewModel() {
     fun filtrar(o: OrigemEvento?) { filtro.value = o }
 }
 
-/** T7 — Histórico (US07, RF07, RNF04). */
 @Composable
 fun HistoricoScreen(vm: HistoricoViewModel = viewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()

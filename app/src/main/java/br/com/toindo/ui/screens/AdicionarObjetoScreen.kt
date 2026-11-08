@@ -79,7 +79,6 @@ class AdicionarObjetoViewModel : ViewModel() {
     private val _ui = MutableStateFlow(NovoObjetoUi())
     val ui = _ui.asStateFlow()
 
-    /** Trocar o tipo aplica os padrões e a regra de segurança daquele tipo. */
     fun tipo(t: TipoObjeto) = _ui.update {
         it.copy(tipo = t, nome = if (it.nome == it.tipo.rotulo || it.nome.isBlank()) t.rotulo else it.nome,
             aoSair = t.aoSairPadrao, aoChegar = t.aoChegarPadrao, teste = StatusTeste.NAO_TESTADO)
@@ -91,7 +90,6 @@ class AdicionarObjetoViewModel : ViewModel() {
     fun aoSair(a: AcaoPresenca) = _ui.update { it.copy(aoSair = a) }
     fun aoChegar(a: AcaoPresenca) = _ui.update { it.copy(aoChegar = a) }
 
-    /** Simula o teste de conexão; na fase Prototype, publicar um "ping" no tópico MQTT. */
     fun testar() = viewModelScope.launch {
         _ui.update { it.copy(teste = StatusTeste.TESTANDO) }
         delay(800)
@@ -107,7 +105,6 @@ class AdicionarObjetoViewModel : ViewModel() {
     }
 }
 
-/** T3 — Adicionar objeto (RF02, RF10, RN04). O tipo define controles e regras. */
 @Composable
 fun AdicionarObjetoScreen(onVoltar: () -> Unit, onConcluir: () -> Unit, vm: AdicionarObjetoViewModel = viewModel()) {
     val ui by vm.ui.collectAsStateWithLifecycle()

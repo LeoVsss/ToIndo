@@ -40,16 +40,15 @@ import br.com.toindo.ui.screens.ResidenciaScreen
 import br.com.toindo.ui.screens.SaidaDetalheScreen
 import br.com.toindo.ui.screens.SaidasScreen
 
-/** Rotas do fluxo de navegação (seção 3 do documento). */
 object Rotas {
-    const val BOAS_VINDAS = "boas_vindas"          // T1
-    const val RESIDENCIA = "residencia"            // T2
-    const val ADICIONAR_OBJETO = "adicionar_objeto" // T3
-    const val INICIO = "inicio"                    // T4
-    const val OBJETO = "objeto/{id}"               // T5
-    const val CONSUMO = "consumo"                  // T6
-    const val HISTORICO = "historico"              // T7
-    const val AJUSTES = "ajustes"                  // T8
+    const val BOAS_VINDAS = "boas_vindas"
+    const val RESIDENCIA = "residencia"
+    const val ADICIONAR_OBJETO = "adicionar_objeto"
+    const val INICIO = "inicio"
+    const val OBJETO = "objeto/{id}"
+    const val CONSUMO = "consumo"
+    const val HISTORICO = "historico"
+    const val AJUSTES = "ajustes"
 
     fun objeto(id: Long) = "objeto/$id"
     const val SAIDAS = "saidas"
@@ -73,7 +72,6 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
     val rotaAtual = entrada?.destination?.route
     val mostrarBarra = abas.any { it.rota == rotaAtual }
 
-    // Notificação de saída/volta: abre o detalhe daquela saída.
     val pedidoSaida by br.com.toindo.service.PedidoAbrirSaida.pendente.collectAsState()
     LaunchedEffect(pedidoSaida) {
         pedidoSaida?.let { id ->

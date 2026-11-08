@@ -11,14 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/**
- * Conversões entity <-> domínio. Mantêm o modelo que as telas já usam intacto
- * (ObjetoInteligente, EventoObjeto, Residencia, Configuracao), isolando o Room.
- */
-
 private val horaFmt = SimpleDateFormat("HH:mm", Locale("pt", "BR"))
-
-// ---------- Residência ----------
 
 fun ResidenciaEntity.paraDominio() = Residencia(
     nome = nome,
@@ -37,8 +30,6 @@ fun Residencia.paraEntity() = ResidenciaEntity(
     raioAproximacaoM = raioAproximacaoM,
 )
 
-// ---------- Configuração ----------
-
 fun ConfiguracaoEntity.paraDominio() = Configuracao(
     tarifaKwh = tarifaKwh,
     tempoConfirmacaoSaidaSeg = tempoConfirmacaoSaidaSeg,
@@ -54,8 +45,6 @@ fun Configuracao.paraEntity(cadastroConcluido: Boolean) = ConfiguracaoEntity(
     automacaoAtiva = automacaoAtiva,
     cadastroConcluido = cadastroConcluido,
 )
-
-// ---------- Objeto ----------
 
 fun ObjetoEntity.paraDominio() = ObjetoInteligente(
     id = id,
@@ -74,10 +63,6 @@ fun ObjetoEntity.paraDominio() = ObjetoInteligente(
     ligadoDesde = ligadoDesdeMillis?.let { horaFmt.format(Date(it)) },
 )
 
-/**
- * Converte domínio -> entity. Como o domínio guarda a hora formatada (String) e não o epoch,
- * [ligadoDesdeMillis] é informado pela camada que conhece o instante real (repositório/motor).
- */
 fun ObjetoInteligente.paraEntity(ligadoDesdeMillis: Long?) = ObjetoEntity(
     id = id,
     nome = nome,
@@ -92,8 +77,6 @@ fun ObjetoInteligente.paraEntity(ligadoDesdeMillis: Long?) = ObjetoEntity(
     automacaoPausada = automacaoPausada,
     ligadoDesdeMillis = if (estado == EstadoDispositivo.LIGADO) ligadoDesdeMillis else null,
 )
-
-// ---------- Evento ----------
 
 fun EventoEntity.paraDominio(): EventoObjeto {
     val data = Date(instanteMillis)
@@ -110,11 +93,8 @@ fun EventoEntity.paraDominio(): EventoObjeto {
     )
 }
 
-// ---------- Consumo ----------
-
 fun ConsumoAgrupado.paraDominio() = ConsumoObjeto(nome = nome, kWh = kWh, custo = custo)
 
-/** "Hoje" / "Ontem" / dd/MM para agrupar o histórico (T7), no fuso do aparelho. */
 private fun rotuloDoDia(instanteMillis: Long): String {
     val inicioHoje = java.util.Calendar.getInstance().apply {
         set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0)

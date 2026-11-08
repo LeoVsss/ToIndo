@@ -42,16 +42,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
- * Fachada única que as telas usam (padrão Repository, seção 8 do Design / seção 5 do Plan).
- * Delega para:
- *   - Room       -> persistência local (RF01, RF02, RF07; RNF04 offline-first)
- *   - Retrofit   -> comando do objeto (RF06; RNF03), via [ServicoDispositivo]
- *   - MotorAutomacao -> regras de presença/segurança (RF03-RF05; RN01-RN05)
- *
- * A presença é calculada aqui a partir do GPS real ([avaliarPosicao], chamado pelo
- * PresencaService) e persistida, junto com o histórico de saídas.
- */
 object RepositorioToIndo {
 
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -61,16 +51,11 @@ object RepositorioToIndo {
     private var servico: ServicoDispositivo = ServicoDispositivoMock()
     @Volatile private var iniciado = false
 
-    /** Serializa a avaliação de presença: leituras de GPS não podem se atropelar. */
     private val mutexPresenca = Mutex()
 
-    /** Instante (epoch millis) em que cada objeto foi ligado - base do consumo (RN04). */
     private val ligadoDesdeMillis = mutableMapOf<Long, Long>()
 
-    /** Leituras de GPS com precisão pior que isso (m) são ignoradas. */
     const val PRECISAO_MAX_M = 30
-
-    // ---------- StateFlows expostos ----------
 
     private val _residencia = MutableStateFlow(Residencia("Casa", -23.5505, -46.6333))
     val residencia: StateFlow<Residencia> = _residencia.asStateFlow()
@@ -78,15 +63,12 @@ object RepositorioToIndo {
     private val _presenca = MutableStateFlow(EstadoPresenca.EM_CASA)
     val presenca: StateFlow<EstadoPresenca> = _presenca.asStateFlow()
 
-    /** Distância atual até a casa (m). Null = ainda sem leitura de GPS. */
     private val _distanciaM = MutableStateFlow<Double?>(null)
     val distanciaM: StateFlow<Double?> = _distanciaM.asStateFlow()
 
-    /** Precisão da última leitura de GPS (m). */
     private val _precisaoM = MutableStateFlow<Int?>(null)
     val precisaoM: StateFlow<Int?> = _precisaoM.asStateFlow()
 
-    /** Quando começou a confirmar a saída (para a tela mostrar a contagem). */
     private val _inicioConfirmacao = MutableStateFlow<Long?>(null)
     val inicioConfirmacao: StateFlow<Long?> = _inicioConfirmacao.asStateFlow()
 
@@ -102,27 +84,19 @@ object RepositorioToIndo {
     private val _eventos = MutableStateFlow<List<EventoObjeto>>(emptyList())
     val eventos: StateFlow<List<EventoObjeto>> = _eventos.asStateFlow()
 
-    /** Intervalos de consumo fechados dos últimos ~31 dias (a tela de Consumo agrega por período). */
     private val _registrosConsumo = MutableStateFlow<List<RegistroConsumoEntity>>(emptyList())
     val registrosConsumo: StateFlow<List<RegistroConsumoEntity>> = _registrosConsumo.asStateFlow()
 
-    /** Histórico de saídas (mais recente primeiro). */
     private val _saidas = MutableStateFlow<List<SaidaComItens>>(emptyList())
     val saidas: StateFlow<List<SaidaComItens>> = _saidas.asStateFlow()
 
     fun saida(id: Long): Flow<SaidaComItens?> = db.saidaDao().observar(id)
 
-    /** Potência (W) por objeto — a tela de Consumo usa para estimar a economia das saídas. */
     fun potenciaW(objetoId: Long): Int = _objetos.value.firstOrNull { it.id == objetoId }?.potenciaW ?: 0
-
-    // ---------- Estado interno da presença (espelho do PresencaEntity) ----------
 
     private var maxDistanciaForaM = 0.0
     private var saidaAbertaId = 0L
 
-    // ---------- Inicialização ----------
-
-    /** Liga o repositório ao Room. Idempotente. Chamar no Application.onCreate. */
     fun iniciar(context: Context, servicoDispositivo: ServicoDispositivo? = null) {
         if (iniciado) return
         iniciado = true
@@ -130,8 +104,6 @@ object RepositorioToIndo {
         db = ToIndoDatabase.obter(appContext)
         servicoDispositivo?.let { servico = it }
 
-        // A presença precisa estar carregada ANTES da primeira leitura de GPS — senão, ao
-        // reabrir o app fora de casa, ele acharia que você está em casa.
         runBlocking(Dispatchers.IO) {
             db.presencaDao().obter()?.let { p ->
                 _presenca.value = runCatching { EstadoPresenca.valueOf(p.estado) }.getOrDefault(EstadoPresenca.EM_CASA)
@@ -182,7 +154,6 @@ object RepositorioToIndo {
             db.configuracaoDao().salvar(Configuracao().paraEntity(cadastroConcluido = false))
         }
         if (db.objetoDao().listar().isEmpty()) {
-            // Dispositivos de exemplo (virtuais, até o Arduino chegar).
             db.residenciaDao().salvar(Residencia("Casa", -23.5505, -46.6333).paraEntity())
             val agora = System.currentTimeMillis()
             val exemplos = listOf(
@@ -209,13 +180,8 @@ object RepositorioToIndo {
         }
     }
 
-    // ---------- Leitura ----------
-
     fun objeto(id: Long): ObjetoInteligente? = _objetos.value.firstOrNull { it.id == id }
 
-    // ---------- Comandos manuais (RF06, RN03) ----------
-
-    /** Comando manual: obedece, comanda o objeto remotamente e pausa a automação dele (RN03). */
     fun alternar(id: Long) {
         escopo.launch {
             val e = db.objetoDao().obter(id) ?: return@launch
@@ -297,17 +263,11 @@ object RepositorioToIndo {
         }
     }
 
-    // ---------- Automação por presença (RF03-RF05, RN01-RN03) ----------
-
-    /**
-     * Nova leitura do GPS real (PresencaService). Calcula a distância até a casa, decide a
-     * presença com o [MotorAutomacao] e aplica a automação quando ela muda.
-     */
     fun avaliarPosicao(lat: Double, lon: Double, precisaoM: Int?) {
         escopo.launch {
             mutexPresenca.withLock {
                 _precisaoM.value = precisaoM
-                if (precisaoM != null && precisaoM > PRECISAO_MAX_M) return@withLock // GPS ruim: ignora
+                if (precisaoM != null && precisaoM > PRECISAO_MAX_M) return@withLock
 
                 val casa = _residencia.value
                 val distancia = Geo.distanciaM(lat, lon, casa.latitude, casa.longitude)
@@ -317,7 +277,6 @@ object RepositorioToIndo {
         }
     }
 
-    /** Até dois passos por leitura: FORA -> CHEGANDO -> EM_CASA pode acontecer de uma vez. */
     private suspend fun avaliarSuspenso(distancia: Double) {
         repeat(2) {
             val atual = _presenca.value
@@ -375,7 +334,6 @@ object RepositorioToIndo {
         val saiu = para == EstadoPresenca.FORA && de != EstadoPresenca.FORA
         val chegando = para == EstadoPresenca.CHEGANDO && de == EstadoPresenca.FORA
         val voltou = para == EstadoPresenca.EM_CASA && (de == EstadoPresenca.FORA || de == EstadoPresenca.CHEGANDO)
-        // RN03: a pausa manual dura até a próxima saída/volta real (não em oscilação do GPS).
         val limparPausa = saiu || voltou
 
         when {
@@ -386,12 +344,11 @@ object RepositorioToIndo {
 
         if (limparPausa) {
             db.objetoDao().listar().filter { it.automacaoPausada }.forEach {
-                db.objetoDao().atualizar(it.copy(automacaoPausada = false)) // RN03: pausa dura até a transição
+                db.objetoDao().atualizar(it.copy(automacaoPausada = false))
             }
         }
     }
 
-    /** Saída confirmada: desliga o que deve desligar, grava a saída e notifica. */
     private suspend fun registrarSaida(agora: Long, automacaoAtiva: Boolean) {
         val itens = mutableListOf<SaidaItemEntity>()
         fun item(e: ObjetoEntity, resultado: String, motivo: String) {
@@ -441,7 +398,6 @@ object RepositorioToIndo {
         }
     }
 
-    /** Entrou no raio de aproximação voltando: liga antes o que está configurado para "Ligar" ao chegar. */
     private suspend fun preLigarAoChegar(agora: Long, automacaoAtiva: Boolean) {
         db.objetoDao().listar().forEach { e ->
             if (e.estado == EstadoDispositivo.INDISPONIVEL) return@forEach
@@ -451,10 +407,6 @@ object RepositorioToIndo {
         }
     }
 
-    /**
-     * Voltou para dentro do radar: religa o que foi desligado na saída (respeitando a regra de
-     * segurança — forno/torradeira nunca ligam sozinhos), fecha a saída e notifica.
-     */
     private suspend fun registrarVolta(agora: Long, automacaoAtiva: Boolean) {
         val saidaId = saidaAbertaId
         val itens = if (saidaId != 0L) db.saidaDao().itens(saidaId) else emptyList()
@@ -462,12 +414,10 @@ object RepositorioToIndo {
         val resultado = mutableMapOf<Long, String>()
 
         db.objetoDao().listar().forEach { e ->
-            // Religa só o que a automação desligou nesta saída (e que não foi pausado manualmente).
             val podeReligar = e.id in desligadosNaSaida && !e.automacaoPausada
             resultado[e.id] = when {
                 e.estado == EstadoDispositivo.INDISPONIVEL -> ResultadoVolta.OFFLINE
                 e.estado == EstadoDispositivo.LIGADO ->
-                    // Pode ter sido ligado no raio de aproximação (pré-ligar).
                     if (itens.firstOrNull { it.objetoId == e.id }?.naVolta == ResultadoVolta.LIGOU) ResultadoVolta.LIGOU
                     else ResultadoVolta.JA_LIGADO
                 !podeReligar || !automacaoAtiva -> ResultadoVolta.CONTINUOU_DESLIGADO
@@ -496,7 +446,6 @@ object RepositorioToIndo {
         }
     }
 
-    /** Liga um objeto pela automação. Retorna false se ele não respondeu. */
     private suspend fun ligarAutomatico(e: ObjetoEntity, agora: Long, motivo: String): Boolean {
         if (!servico.ligar(e.enderecoRemoto)) return false
         ligadoDesdeMillis[e.id] = agora
@@ -514,16 +463,11 @@ object RepositorioToIndo {
         else -> "Mantido ligado"
     }
 
-    // ---------- Sincronização offline-first (RNF04) ----------
-
-    /** Reenvia eventos pendentes quando a conectividade volta. Chamar do WorkManager. */
     fun sincronizarPendentes() {
         escopo.launch {
             db.eventoDao().pendentes().forEach { db.eventoDao().marcarSincronizado(it.id) }
         }
     }
-
-    // ---------- Internos ----------
 
     private suspend fun atualizarConfigSuspenso(transform: (Configuracao) -> Configuracao) {
         val atualEntity = db.configuracaoDao().obter()
@@ -552,12 +496,11 @@ object RepositorioToIndo {
                 motivo = motivo,
                 tipoObjeto = objeto.tipo,
                 instanteMillis = instante,
-                sincronizado = false, // RNF04: nasce pendente, sincroniza depois
+                sincronizado = false,
             )
         )
     }
 
-    /** Fecha o intervalo de consumo de um objeto que estava ligado (RN04). */
     private suspend fun fecharConsumo(id: Long, fimMillis: Long) {
         val e = db.objetoDao().obter(id) ?: return
         val inicio = ligadoDesdeMillis.remove(id) ?: e.ligadoDesdeMillis ?: return

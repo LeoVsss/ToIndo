@@ -6,13 +6,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
-/**
- * Banco local do app (seção 5: "Room (local) para eventos, regras e consumo").
- * Única fonte da verdade local - o estado dos objetos sobrevive ao fechamento do app (RNF04).
- *
- * v2: presença persistida + histórico de saídas (saidas / saida_itens) e confirmação em segundos.
- * Por ser protótipo, uma mudança de versão recria o banco (fallbackToDestructiveMigration).
- */
 @Database(
     entities = [
         ResidenciaEntity::class,

@@ -50,7 +50,6 @@ private val Escuro = darkColorScheme(
     outlineVariant = ContornoEscuro,
 )
 
-/** Cores de significado fora do esquema M3: energia/custo, economia e presença. */
 @Immutable
 data class CoresExtras(
     val energiaTexto: Color,
@@ -78,7 +77,6 @@ private val ExtrasEscuro = CoresExtras(
 
 val LocalCoresExtras = staticCompositionLocalOf { ExtrasClaro }
 
-/** Cantos do documento: chips 8, botões e campos 16, cards 24. */
 val FormasToIndo = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
@@ -87,7 +85,6 @@ val FormasToIndo = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
-/** Espaçamentos em grade de 4 dp. */
 object Espaco {
     val xs = 4.dp
     val s = 8.dp

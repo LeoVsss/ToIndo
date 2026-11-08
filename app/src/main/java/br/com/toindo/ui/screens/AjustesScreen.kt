@@ -52,7 +52,6 @@ class AjustesViewModel : ViewModel() {
     }
 }
 
-/** T8 — Ajustes (US06, RF09, RNF02, RN01, RN05). */
 @Composable
 fun AjustesScreen(
     onEditarResidencia: () -> Unit,
@@ -105,7 +104,7 @@ fun AjustesScreen(
         CardToIndo(padding = Espaco.l) {
             LinhaDeLista("Editar residência", onClick = onEditarResidencia)
             LinhaDeLista("Objetos inteligentes", valor = "${objetos.size}", onClick = onObjetos)
-            LinhaDeLista("Moradores", valor = "2", onClick = { /* lista de moradores (RN05) */ }, divisor = false)
+            LinhaDeLista("Moradores", valor = "2", onClick = {  }, divisor = false)
         }
 
         RotuloDeSecao("Notificações e privacidade")
@@ -114,7 +113,7 @@ fun AjustesScreen(
                 Switch(checked = config.notificacoesAtivas, onCheckedChange = vm::notificacoes)
             })
             LinhaDeLista("Localização fica só no aparelho", detalhe = "Nada é enviado a servidores (LGPD)")
-            TextButton(onClick = { /* confirmar e apagar dados locais */ }, modifier = Modifier.padding(top = 4.dp)) {
+            TextButton(onClick = {  }, modifier = Modifier.padding(top = 4.dp)) {
                 Text("Apagar meus dados", color = MaterialTheme.colorScheme.error)
             }
         }
