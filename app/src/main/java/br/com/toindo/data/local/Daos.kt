@@ -48,6 +48,9 @@ interface ObjetoDao {
 
     @Update
     suspend fun atualizar(objeto: ObjetoEntity)
+
+    @Query("DELETE FROM objetos WHERE id = :id")
+    suspend fun remover(id: Long)
 }
 
 @Dao

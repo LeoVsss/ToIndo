@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -57,12 +58,14 @@ fun AjustesScreen(
     onEditarResidencia: () -> Unit,
     onObjetos: () -> Unit,
     onAbrirSaidas: () -> Unit = {},
+    onDadosApagados: () -> Unit = {},
     vm: AjustesViewModel = viewModel(),
 ) {
     val config by vm.configuracao.collectAsStateWithLifecycle()
     val casa by vm.residencia.collectAsStateWithLifecycle()
     val objetos by vm.objetos.collectAsStateWithLifecycle()
     val saidas by RepositorioToIndo.saidas.collectAsStateWithLifecycle()
+    var confirmarApagar by remember { mutableStateOf(false) }
     var tarifaTexto by remember { mutableStateOf("%.2f".format(config.tarifaKwh).replace('.', ',')) }
 
     Column(
@@ -103,8 +106,7 @@ fun AjustesScreen(
         RotuloDeSecao("Casa")
         CardToIndo(padding = Espaco.l) {
             LinhaDeLista("Editar residência", onClick = onEditarResidencia)
-            LinhaDeLista("Objetos inteligentes", valor = "${objetos.size}", onClick = onObjetos)
-            LinhaDeLista("Moradores", valor = "2", onClick = {  }, divisor = false)
+            LinhaDeLista("Objetos inteligentes", valor = "${objetos.size}", onClick = onObjetos, divisor = false)
         }
 
         RotuloDeSecao("Notificações e privacidade")
@@ -113,10 +115,24 @@ fun AjustesScreen(
                 Switch(checked = config.notificacoesAtivas, onCheckedChange = vm::notificacoes)
             })
             LinhaDeLista("Localização fica só no aparelho", detalhe = "Nada é enviado a servidores (LGPD)")
-            TextButton(onClick = {  }, modifier = Modifier.padding(top = 4.dp)) {
+            TextButton(onClick = { confirmarApagar = true }, modifier = Modifier.padding(top = 4.dp)) {
                 Text("Apagar meus dados", color = MaterialTheme.colorScheme.error)
             }
         }
         Column(Modifier.padding(bottom = Espaco.l)) {}
+    }
+
+    if (confirmarApagar) {
+        AlertDialog(
+            onDismissRequest = { confirmarApagar = false },
+            title = { Text("Apagar meus dados?") },
+            text = { Text("Residência, objetos, histórico, consumo e ajustes serão apagados deste aparelho. Esta ação não pode ser desfeita.") },
+            confirmButton = {
+                TextButton(onClick = { confirmarApagar = false; RepositorioToIndo.apagarTodosDados(); onDadosApagados() }) {
+                    Text("Apagar tudo", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmarApagar = false }) { Text("Cancelar") } },
+        )
     }
 }

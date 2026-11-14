@@ -1,6 +1,8 @@
 package br.com.toindo.ui.navigation
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.History
@@ -44,6 +46,8 @@ object Rotas {
     const val BOAS_VINDAS = "boas_vindas"
     const val RESIDENCIA = "residencia"
     const val ADICIONAR_OBJETO = "adicionar_objeto"
+    const val ADICIONAR_OBJETO_ROTA = "adicionar_objeto?id={id}"
+    fun editarObjeto(id: Long) = "adicionar_objeto?id=$id"
     const val INICIO = "inicio"
     const val OBJETO = "objeto/{id}"
     const val CONSUMO = "consumo"
@@ -80,6 +84,11 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
         }
     }
 
+    val contexto = LocalContext.current
+    LaunchedEffect(Unit) {
+        RepositorioToIndo.avisos.collect { Toast.makeText(contexto, it, Toast.LENGTH_SHORT).show() }
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = { if (mostrarBarra) BarraInferior(rotaAtual, navController) },
@@ -97,8 +106,12 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
                     },
                 )
             }
-            composable(Rotas.ADICIONAR_OBJETO) {
+            composable(
+                Rotas.ADICIONAR_OBJETO_ROTA,
+                arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L }),
+            ) { e ->
                 AdicionarObjetoScreen(
+                    idEdicao = e.arguments?.getLong("id")?.takeIf { it > 0 },
                     onVoltar = { navController.popBackStack() },
                     onConcluir = {
                         if (RepositorioToIndo.cadastroConcluido.value) {
@@ -124,7 +137,7 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
                 DetalheObjetoScreen(
                     id = e.arguments?.getLong("id") ?: 0L,
                     onVoltar = { navController.popBackStack() },
-                    onEditar = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
+                    onEditar = { navController.navigate(Rotas.editarObjeto(e.arguments?.getLong("id") ?: 0L)) },
                 )
             }
             composable(Rotas.CONSUMO) { ConsumoScreen() }
@@ -134,6 +147,9 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
                     onEditarResidencia = { navController.navigate(Rotas.RESIDENCIA) },
                     onObjetos = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
                     onAbrirSaidas = { navController.navigate(Rotas.SAIDAS) },
+                    onDadosApagados = {
+                        navController.navigate(Rotas.BOAS_VINDAS) { popUpTo(0) { inclusive = true } }
+                    },
                 )
             }
             composable(Rotas.SAIDAS) {

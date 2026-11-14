@@ -16,7 +16,7 @@ android {
         versionCode = 1
         versionName = "0.2-prototype"
 
-        buildConfigField("String", "URL_BASE_API", "\"https://toindo.mock/\"")
+        buildConfigField("String", "TOKEN_DISPOSITIVO", "\"toindo-token\"")
     }
 
     buildTypes {

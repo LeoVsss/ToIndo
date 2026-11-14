@@ -14,7 +14,8 @@ import br.com.toindo.data.local.ToIndoDatabase
 import br.com.toindo.data.local.paraDominio
 import br.com.toindo.data.local.paraEntity
 import br.com.toindo.data.remote.ServicoDispositivo
-import br.com.toindo.data.remote.ServicoDispositivoMock
+import br.com.toindo.data.remote.Rede
+import br.com.toindo.data.remote.ServicoDispositivoHttp
 import br.com.toindo.domain.CalculadoraConsumo
 import br.com.toindo.domain.Geo
 import br.com.toindo.domain.MotorAutomacao
@@ -34,7 +35,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -48,10 +52,15 @@ object RepositorioToIndo {
 
     private lateinit var appContext: Context
     private lateinit var db: ToIndoDatabase
-    private var servico: ServicoDispositivo = ServicoDispositivoMock()
+    private lateinit var servico: ServicoDispositivo
     @Volatile private var iniciado = false
 
     private val mutexPresenca = Mutex()
+
+    private val _avisos = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val avisos: SharedFlow<String> = _avisos.asSharedFlow()
+
+    suspend fun testarConexao(endereco: String): Boolean = servico.ping(endereco)
 
     private val ligadoDesdeMillis = mutableMapOf<Long, Long>()
 
@@ -102,7 +111,7 @@ object RepositorioToIndo {
         iniciado = true
         appContext = context.applicationContext
         db = ToIndoDatabase.obter(appContext)
-        servicoDispositivo?.let { servico = it }
+        servico = servicoDispositivo ?: ServicoDispositivoHttp(Rede.criarApi())
 
         runBlocking(Dispatchers.IO) {
             db.presencaDao().obter()?.let { p ->
@@ -152,31 +161,7 @@ object RepositorioToIndo {
     private suspend fun semearSeVazio() {
         if (db.configuracaoDao().obter() == null) {
             db.configuracaoDao().salvar(Configuracao().paraEntity(cadastroConcluido = false))
-        }
-        if (db.objetoDao().listar().isEmpty()) {
             db.residenciaDao().salvar(Residencia("Casa", -23.5505, -46.6333).paraEntity())
-            val agora = System.currentTimeMillis()
-            val exemplos = listOf(
-                ObjetoEntity(0, "Forno", TipoObjeto.FORNO, "Cozinha", 1500, "casa/cozinha/forno",
-                    EstadoDispositivo.LIGADO, mapOf("TEMPERATURA" to 180, "TIMER" to 30),
-                    TipoObjeto.FORNO.aoSairPadrao, TipoObjeto.FORNO.aoChegarPadrao, false, agora),
-                ObjetoEntity(0, "Ar do quarto", TipoObjeto.AR_CONDICIONADO, "Quarto", 1000, "casa/quarto/ar",
-                    EstadoDispositivo.LIGADO, mapOf("TEMPERATURA" to 23),
-                    TipoObjeto.AR_CONDICIONADO.aoSairPadrao, TipoObjeto.AR_CONDICIONADO.aoChegarPadrao, false, agora),
-                ObjetoEntity(0, "Geladeira", TipoObjeto.GELADEIRA, "Cozinha", 150, "casa/cozinha/geladeira",
-                    EstadoDispositivo.LIGADO, mapOf("TEMPERATURA" to 4),
-                    TipoObjeto.GELADEIRA.aoSairPadrao, TipoObjeto.GELADEIRA.aoChegarPadrao, false, agora),
-                ObjetoEntity(0, "TV da sala", TipoObjeto.TV, "Sala", 120, "casa/sala/tv",
-                    EstadoDispositivo.LIGADO, mapOf("VOLUME" to 20, "CANAL" to 5),
-                    TipoObjeto.TV.aoSairPadrao, TipoObjeto.TV.aoChegarPadrao, false, agora),
-                ObjetoEntity(0, "Lâmpada da sala", TipoObjeto.LAMPADA, "Sala", 15, "casa/sala/lampada",
-                    EstadoDispositivo.LIGADO, mapOf("BRILHO" to 80),
-                    TipoObjeto.LAMPADA.aoSairPadrao, TipoObjeto.LAMPADA.aoChegarPadrao, false, agora),
-                ObjetoEntity(0, "Torradeira", TipoObjeto.TORRADEIRA, "Cozinha", 800, "casa/cozinha/torradeira",
-                    EstadoDispositivo.DESLIGADO, mapOf("TIMER" to 5),
-                    TipoObjeto.TORRADEIRA.aoSairPadrao, TipoObjeto.TORRADEIRA.aoChegarPadrao, false, null),
-            )
-            exemplos.forEach { db.objetoDao().inserir(it) }
         }
     }
 
@@ -187,7 +172,10 @@ object RepositorioToIndo {
             val e = db.objetoDao().obter(id) ?: return@launch
             val ligando = e.estado != EstadoDispositivo.LIGADO
             val aceito = if (ligando) servico.ligar(e.enderecoRemoto) else servico.desligar(e.enderecoRemoto)
-            if (!aceito) return@launch
+            if (!aceito) {
+                _avisos.tryEmit("Sem resposta de ${e.nome}. Confira o endereço e a rede.")
+                return@launch
+            }
 
             val agora = System.currentTimeMillis()
             if (ligando) {
@@ -211,8 +199,13 @@ object RepositorioToIndo {
     fun ajustar(id: Long, controle: Controle, valor: Int) {
         escopo.launch {
             val e = db.objetoDao().obter(id) ?: return@launch
-            val v = valor.coerceIn(controle.min, controle.max)
-            if (!servico.ajustar(e.enderecoRemoto, controle, v)) return@launch
+            if (controle !in e.tipo.controles) return@launch
+            val faixa = e.tipo.faixa(controle)
+            val v = valor.coerceIn(faixa.first, faixa.last)
+            if (!servico.ajustar(e.enderecoRemoto, controle, v)) {
+                _avisos.tryEmit("Sem resposta de ${e.nome}. Confira o endereço e a rede.")
+                return@launch
+            }
             db.objetoDao().atualizar(e.copy(parametros = e.parametros + (controle.name to v), automacaoPausada = true))
         }
     }
@@ -230,6 +223,74 @@ object RepositorioToIndo {
             db.objetoDao().inserir(
                 novo.paraEntity(ligadoDesdeMillis = if (novo.ligado) agora else null).copy(id = 0)
             )
+        }
+    }
+
+    fun editar(
+        id: Long,
+        nome: String,
+        tipo: TipoObjeto,
+        comodo: String,
+        potenciaW: Int,
+        enderecoRemoto: String,
+        aoSair: AcaoPresenca,
+        aoChegar: AcaoPresenca,
+    ) {
+        escopo.launch {
+            val e = db.objetoDao().obter(id) ?: return@launch
+            val agora = System.currentTimeMillis()
+            var desde = e.ligadoDesdeMillis
+            if (e.estado == EstadoDispositivo.LIGADO && potenciaW != e.potenciaW) {
+                fecharConsumo(id, agora)
+                ligadoDesdeMillis[id] = agora
+                desde = agora
+            }
+            val parametros = e.parametros.filterKeys { chave ->
+                tipo.controles.any { it.name == chave }
+            }
+            db.objetoDao().atualizar(
+                e.copy(
+                    nome = nome,
+                    tipo = tipo,
+                    comodo = comodo,
+                    potenciaW = potenciaW,
+                    enderecoRemoto = enderecoRemoto,
+                    parametros = parametros,
+                    acaoAoSair = aoSair,
+                    acaoAoChegar = aoChegar,
+                    ligadoDesdeMillis = desde,
+                )
+            )
+        }
+    }
+
+    fun remover(id: Long) {
+        escopo.launch {
+            val e = db.objetoDao().obter(id) ?: return@launch
+            if (e.estado == EstadoDispositivo.LIGADO) fecharConsumo(id, System.currentTimeMillis())
+            ligadoDesdeMillis.remove(id)
+            db.objetoDao().remover(id)
+        }
+    }
+
+    fun apagarTodosDados() {
+        escopo.launch {
+            mutexPresenca.withLock {
+                db.clearAllTables()
+                ligadoDesdeMillis.clear()
+                maxDistanciaForaM = 0.0
+                saidaAbertaId = 0L
+                _presenca.value = EstadoPresenca.EM_CASA
+                _inicioConfirmacao.value = null
+                _distanciaM.value = null
+                _precisaoM.value = null
+                val padrao = Residencia("Casa", -23.5505, -46.6333)
+                _residencia.value = padrao
+                _configuracao.value = Configuracao()
+                _cadastroConcluido.value = false
+                db.residenciaDao().salvar(padrao.paraEntity())
+                db.configuracaoDao().salvar(Configuracao().paraEntity(cadastroConcluido = false))
+            }
         }
     }
 

@@ -38,6 +38,13 @@ enum class TipoObjeto(
     TOMADA("Tomada", "Tomada", emptyList(), AcaoPresenca.DESLIGAR, AcaoPresenca.NADA, true),
     OUTRO("Outro", "Outro", emptyList(), AcaoPresenca.DESLIGAR, AcaoPresenca.NADA, true);
 
+    fun faixa(c: Controle): IntRange = when {
+        c == Controle.TEMPERATURA && this == AR_CONDICIONADO -> 16..30
+        c == Controle.TEMPERATURA && this == GELADEIRA -> 1..10
+        c == Controle.TEMPERATURA && this == FORNO -> 50..250
+        else -> c.min..c.max
+    }
+
     val acoesAoChegar: List<AcaoPresenca>
         get() = if (podeLigarSozinho) listOf(AcaoPresenca.LIGAR, AcaoPresenca.NADA) else listOf(AcaoPresenca.NADA)
 

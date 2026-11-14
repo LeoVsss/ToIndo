@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,7 +55,6 @@ import br.com.toindo.ui.components.TopoComVoltar
 import br.com.toindo.ui.components.icone
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -63,16 +63,18 @@ import kotlinx.coroutines.launch
 enum class StatusTeste { NAO_TESTADO, TESTANDO, OK, FALHOU }
 
 data class NovoObjetoUi(
-    val tipo: TipoObjeto = TipoObjeto.FORNO,
-    val nome: String = "Forno",
-    val comodo: String = "Cozinha",
-    val potenciaW: String = "1500",
-    val endereco: String = "casa/cozinha/forno",
-    val aoSair: AcaoPresenca = TipoObjeto.FORNO.aoSairPadrao,
-    val aoChegar: AcaoPresenca = TipoObjeto.FORNO.aoChegarPadrao,
+    val idEdicao: Long? = null,
+    val tipo: TipoObjeto = TipoObjeto.AR_CONDICIONADO,
+    val nome: String = TipoObjeto.AR_CONDICIONADO.rotulo,
+    val comodo: String = "",
+    val potenciaW: String = "",
+    val endereco: String = "",
+    val aoSair: AcaoPresenca = TipoObjeto.AR_CONDICIONADO.aoSairPadrao,
+    val aoChegar: AcaoPresenca = TipoObjeto.AR_CONDICIONADO.aoChegarPadrao,
     val teste: StatusTeste = StatusTeste.NAO_TESTADO,
 ) {
-    val valido get() = nome.isNotBlank() && (potenciaW.toIntOrNull() ?: 0) > 0 && endereco.isNotBlank()
+    val valido get() = nome.isNotBlank() && (potenciaW.toIntOrNull() ?: 0) > 0 &&
+        endereco.isNotBlank() && endereco.none { it.isWhitespace() }
 }
 
 class AdicionarObjetoViewModel : ViewModel() {
@@ -90,14 +92,35 @@ class AdicionarObjetoViewModel : ViewModel() {
     fun aoSair(a: AcaoPresenca) = _ui.update { it.copy(aoSair = a) }
     fun aoChegar(a: AcaoPresenca) = _ui.update { it.copy(aoChegar = a) }
 
-    fun testar() = viewModelScope.launch {
-        _ui.update { it.copy(teste = StatusTeste.TESTANDO) }
-        delay(800)
-        _ui.update { it.copy(teste = if (it.endereco.contains('/')) StatusTeste.OK else StatusTeste.FALHOU) }
+    fun carregar(id: Long?) {
+        if (id == null || _ui.value.idEdicao == id) return
+        val o = RepositorioToIndo.objeto(id) ?: return
+        _ui.value = NovoObjetoUi(
+            idEdicao = o.id, tipo = o.tipo, nome = o.nome, comodo = o.comodo,
+            potenciaW = o.potenciaW.toString(), endereco = o.enderecoRemoto,
+            aoSair = o.acaoAoSair, aoChegar = o.acaoAoChegar,
+        )
+    }
+
+    fun testar() {
+        val endereco = _ui.value.endereco
+        if (endereco.isBlank()) return
+        viewModelScope.launch {
+            _ui.update { it.copy(teste = StatusTeste.TESTANDO) }
+            val ok = RepositorioToIndo.testarConexao(endereco)
+            _ui.update { if (it.endereco == endereco) it.copy(teste = if (ok) StatusTeste.OK else StatusTeste.FALHOU) else it }
+        }
     }
 
     fun salvar() {
         val u = _ui.value
+        if (u.idEdicao != null) {
+            RepositorioToIndo.editar(
+                u.idEdicao, u.nome.trim(), u.tipo, u.comodo.trim().ifBlank { "Casa" },
+                u.potenciaW.toInt(), u.endereco, u.aoSair, u.aoChegar,
+            )
+            return
+        }
         RepositorioToIndo.adicionar(
             ObjetoInteligente(0, u.nome.trim(), u.tipo, u.comodo.trim().ifBlank { "Casa" }, u.potenciaW.toInt(), u.endereco,
                 EstadoDispositivo.DESLIGADO, acaoAoSair = u.aoSair, acaoAoChegar = u.aoChegar)
@@ -106,16 +129,22 @@ class AdicionarObjetoViewModel : ViewModel() {
 }
 
 @Composable
-fun AdicionarObjetoScreen(onVoltar: () -> Unit, onConcluir: () -> Unit, vm: AdicionarObjetoViewModel = viewModel()) {
+fun AdicionarObjetoScreen(
+    idEdicao: Long?,
+    onVoltar: () -> Unit,
+    onConcluir: () -> Unit,
+    vm: AdicionarObjetoViewModel = viewModel(),
+) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val editando = RepositorioToIndo.cadastroConcluido.value
+    LaunchedEffect(idEdicao) { vm.carregar(idEdicao) }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Espaco.margem),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         TopoComVoltar(titulo = null, subtitulo = if (editando) null else "Passo 2 de 2", onVoltar = onVoltar)
-        Text("Adicionar objeto", style = MaterialTheme.typography.headlineSmall)
+        Text(if (ui.idEdicao != null) "Editar objeto" else "Adicionar objeto", style = MaterialTheme.typography.headlineSmall)
 
         Text("Que tipo de objeto é?", style = MaterialTheme.typography.titleSmall)
         Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(Espaco.s)) {
@@ -135,7 +164,7 @@ fun AdicionarObjetoScreen(onVoltar: () -> Unit, onConcluir: () -> Unit, vm: Adic
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Campo("Potência (W)", ui.potenciaW, vm::potencia, Modifier.weight(1f), numerico = true,
                         ajuda = "Está na etiqueta do aparelho")
-                    Campo("Endereço (MQTT)", ui.endereco, vm::endereco, Modifier.weight(1f))
+                    Campo("Endereço (IP)", ui.endereco, vm::endereco, Modifier.weight(1f), ajuda = "Ex.: 192.168.0.50")
                 }
             }
             Box(Modifier.fillMaxWidth().padding(vertical = Espaco.m).height(1.dp).background(MaterialTheme.colorScheme.outline))
@@ -152,10 +181,10 @@ fun AdicionarObjetoScreen(onVoltar: () -> Unit, onConcluir: () -> Unit, vm: Adic
             }
         }
 
-        TesteConexao(ui.teste, onTestar = vm::testar)
+        TesteConexao(ui.teste, habilitado = ui.endereco.isNotBlank(), onTestar = vm::testar)
 
         BotaoPrincipal(
-            if (editando) "Salvar objeto" else "Adicionar",
+            if (ui.idEdicao != null) "Salvar alterações" else if (editando) "Adicionar objeto" else "Adicionar",
             onClick = { vm.salvar(); onConcluir() },
             habilitado = ui.valido,
             modifier = Modifier.padding(bottom = Espaco.xl),
@@ -206,10 +235,10 @@ private fun Acoes(rotulo: String, opcoes: List<AcaoPresenca>, atual: AcaoPresenc
 }
 
 @Composable
-private fun TesteConexao(status: StatusTeste, onTestar: () -> Unit) {
+private fun TesteConexao(status: StatusTeste, habilitado: Boolean, onTestar: () -> Unit) {
     val (fundo, tinta, texto) = when (status) {
         StatusTeste.OK -> Triple(ToIndo.extras.economiaFundo, ToIndo.extras.economiaTexto, "Objeto respondeu ao teste")
-        StatusTeste.FALHOU -> Triple(MaterialTheme.colorScheme.error.copy(alpha = 0.12f), MaterialTheme.colorScheme.error, "Sem resposta. Confira o endereço.")
+        StatusTeste.FALHOU -> Triple(MaterialTheme.colorScheme.error.copy(alpha = 0.12f), MaterialTheme.colorScheme.error, "Sem resposta. Confira o IP, a rede e o Arduino.")
         StatusTeste.TESTANDO -> Triple(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurfaceVariant, "Testando conexão…")
         StatusTeste.NAO_TESTADO -> Triple(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurfaceVariant, "Teste se o objeto responde")
     }
@@ -225,6 +254,6 @@ private fun TesteConexao(status: StatusTeste, onTestar: () -> Unit) {
             else -> {}
         }
         Text(texto, style = MaterialTheme.typography.titleSmall, color = tinta, modifier = Modifier.weight(1f))
-        TextButton(onClick = onTestar, enabled = status != StatusTeste.TESTANDO) { Text("Testar") }
+        TextButton(onClick = onTestar, enabled = habilitado && status != StatusTeste.TESTANDO) { Text("Testar") }
     }
 }

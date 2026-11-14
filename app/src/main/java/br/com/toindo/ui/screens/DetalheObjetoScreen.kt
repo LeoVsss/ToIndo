@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -27,8 +28,12 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -39,6 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.toindo.data.RepositorioToIndo
 import br.com.toindo.model.AcaoPresenca
 import br.com.toindo.model.Controle
+import br.com.toindo.model.EstadoDispositivo
 import br.com.toindo.model.ObjetoInteligente
 import br.com.toindo.ui.components.CardToIndo
 import br.com.toindo.ui.components.Faixa
@@ -52,7 +58,8 @@ class DetalheObjetoViewModel : ViewModel() {
     val objetos = RepositorioToIndo.objetos
     fun alternar(id: Long) = RepositorioToIndo.alternar(id)
     fun ajustar(o: ObjetoInteligente, c: Controle, delta: Int) =
-        RepositorioToIndo.ajustar(o.id, c, (o.parametros[c] ?: c.min) + delta * c.passo)
+        RepositorioToIndo.ajustar(o.id, c, (o.parametros[c] ?: o.tipo.faixa(c).first) + delta * c.passo)
+    fun remover(id: Long) = RepositorioToIndo.remover(id)
     fun acoes(o: ObjetoInteligente, aoSair: AcaoPresenca = o.acaoAoSair, aoChegar: AcaoPresenca = o.acaoAoChegar) =
         RepositorioToIndo.definirAcoes(o.id, aoSair, aoChegar)
 }
@@ -60,6 +67,7 @@ class DetalheObjetoViewModel : ViewModel() {
 @Composable
 fun DetalheObjetoScreen(id: Long, onVoltar: () -> Unit, onEditar: () -> Unit, vm: DetalheObjetoViewModel = viewModel()) {
     val objetos by vm.objetos.collectAsStateWithLifecycle()
+    var confirmarRemocao by remember { mutableStateOf(false) }
     val o = objetos.firstOrNull { it.id == id } ?: run { Text("Objeto não encontrado", Modifier.padding(Espaco.margem)); return }
 
     Column(
@@ -74,7 +82,7 @@ fun DetalheObjetoScreen(id: Long, onVoltar: () -> Unit, onEditar: () -> Unit, vm
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (o.ligado) o.ligadoDesde?.let { "Ligado desde $it" } ?: "Ligado" else "Desligado",
+                        if (o.ligado) o.ligadoDesde?.let { "Ligado desde $it" } ?: "Ligado" else if (o.estado == EstadoDispositivo.INDISPONIVEL) "Sem conexão" else "Desligado",
                         style = MaterialTheme.typography.bodyMedium,
                         color = if (o.ligado) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -124,7 +132,23 @@ fun DetalheObjetoScreen(id: Long, onVoltar: () -> Unit, onEditar: () -> Unit, vm
                 Icons.Rounded.Info, MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
-        Spacer(Modifier.height(Espaco.xl))
+        TextButton(onClick = { confirmarRemocao = true }, modifier = Modifier.padding(bottom = Espaco.xl)) {
+            Text("Remover objeto", color = MaterialTheme.colorScheme.error)
+        }
+    }
+
+    if (confirmarRemocao) {
+        AlertDialog(
+            onDismissRequest = { confirmarRemocao = false },
+            title = { Text("Remover objeto?") },
+            text = { Text("${o.nome} será removido do app. O histórico e o consumo já registrados continuam salvos.") },
+            confirmButton = {
+                TextButton(onClick = { confirmarRemocao = false; vm.remover(o.id); onVoltar() }) {
+                    Text("Remover", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmarRemocao = false }) { Text("Cancelar") } },
+        )
     }
 }
 
@@ -133,7 +157,7 @@ private fun CaixaControle(o: ObjetoInteligente, c: Controle, vm: DetalheObjetoVi
     Surface(modifier, shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(c.rotulo, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
-            val v = o.parametros[c] ?: c.min
+            val v = o.parametros[c] ?: o.tipo.faixa(c).first
             Box { Stepper("$v ${c.unidade}".trim(), c.rotulo.lowercase(), { vm.ajustar(o, c, -1) }, { vm.ajustar(o, c, +1) }) }
         }
     }

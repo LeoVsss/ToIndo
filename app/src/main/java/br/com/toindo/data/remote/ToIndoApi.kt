@@ -1,28 +1,35 @@
 package br.com.toindo.data.remote
 
-import com.squareup.moshi.JsonClass
 import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.Url
 
 interface ToIndoApi {
 
-    @POST("objetos/{endereco}/comando")
+    @GET
+    suspend fun ping(
+        @Url url: String,
+        @Header("X-Token") token: String,
+    ): RespostaComandoDto
+
+    @POST
     suspend fun enviarComando(
-        @Path("endereco", encoded = true) endereco: String,
+        @Url url: String,
+        @Header("X-Token") token: String,
         @Body comando: ComandoDto,
     ): RespostaComandoDto
 }
 
-@JsonClass(generateAdapter = true)
 data class ComandoDto(
     val acao: String,
     val controle: String? = null,
     val valor: Int? = null,
 )
 
-@JsonClass(generateAdapter = true)
 data class RespostaComandoDto(
-    val ok: Boolean,
+    val ok: Boolean = false,
     val estado: String? = null,
+    val nome: String? = null,
 )
