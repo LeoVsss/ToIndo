@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PowerSettingsNew
-import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +49,6 @@ import kotlinx.coroutines.flow.stateIn
 data class HistoricoUi(
     val filtro: OrigemEvento? = null,
     val porDia: Map<String, List<EventoObjeto>> = emptyMap(),
-    val pendentes: Int = 0,
 )
 
 class HistoricoViewModel : ViewModel() {
@@ -59,7 +57,6 @@ class HistoricoViewModel : ViewModel() {
         HistoricoUi(
             filtro = f,
             porDia = eventos.filter { f == null || it.origem == f }.groupBy { it.dia },
-            pendentes = eventos.count { !it.sincronizado },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoricoUi())
 
@@ -80,12 +77,6 @@ fun HistoricoScreen(vm: HistoricoViewModel = viewModel()) {
             OrigemEvento.entries.forEach { o ->
                 FilterChip(ui.filtro == o, { vm.filtrar(o) }, { Text(o.rotulo) }, shape = MaterialTheme.shapes.extraSmall)
             }
-        }
-        if (ui.pendentes > 0) {
-            Faixa(
-                "Sem internet: ${ui.pendentes} ${if (ui.pendentes == 1) "evento aguardando" else "eventos aguardando"} sincronização",
-                Icons.Rounded.WifiOff, ToIndo.extras.energiaFundo, ToIndo.extras.energiaTexto,
-            )
         }
         ui.porDia.forEach { (dia, eventos) ->
             RotuloDeSecao(dia)
@@ -121,7 +112,6 @@ private fun LinhaEvento(e: EventoObjeto) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.s)) {
                 ChipOrigem(e.origem)
                 Text(e.motivo, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!e.sincronizado) Text("· pendente", style = MaterialTheme.typography.bodySmall, color = ToIndo.extras.energiaTexto)
             }
         }
     }

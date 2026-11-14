@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -17,7 +19,7 @@ import androidx.room.TypeConverters
         SaidaEntity::class,
         SaidaItemEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -31,6 +33,12 @@ abstract class ToIndoDatabase : RoomDatabase() {
     abstract fun saidaDao(): SaidaDao
 
     companion object {
+        private val MIGRACAO_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE saida_itens ADD COLUMN potenciaW INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile private var instancia: ToIndoDatabase? = null
 
         fun obter(context: Context): ToIndoDatabase =
@@ -39,7 +47,8 @@ abstract class ToIndoDatabase : RoomDatabase() {
                     context.applicationContext,
                     ToIndoDatabase::class.java,
                     "toindo.db",
-                ).fallbackToDestructiveMigration()
+                ).addMigrations(MIGRACAO_2_3)
+                    .fallbackToDestructiveMigration()
                     .build().also { instancia = it }
             }
     }

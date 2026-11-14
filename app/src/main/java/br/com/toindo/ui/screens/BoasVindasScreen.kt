@@ -51,6 +51,7 @@ fun BoasVindasScreen(onContinuar: () -> Unit) {
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
     }.toTypedArray()
+    val politicaAberta = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     val pedir = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { onContinuar() }
 
     Column(
@@ -79,11 +80,29 @@ fun BoasVindasScreen(onContinuar: () -> Unit) {
             ItemPermissao(Icons.Rounded.Notifications, "Notificações", "Avisamos sempre que um objeto for ligado ou desligado.")
             ItemPermissao(Icons.Rounded.Shield, "Seus dados ficam no aparelho", "A localização não é enviada a ninguém (LGPD).", ultimo = true)
         }
+        if (politicaAberta.value) PoliticaPrivacidade { politicaAberta.value = false }
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             BotaoPrincipal("Permitir e continuar", onClick = { pedir.launch(permissoes) })
-            TextButton(onClick = {  }) { Text("Ver política de privacidade") }
+            TextButton(onClick = { politicaAberta.value = true }) { Text("Ver política de privacidade") }
         }
     }
+}
+
+@Composable
+private fun PoliticaPrivacidade(onFechar: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onFechar,
+        title = { Text("Política de privacidade") },
+        text = {
+            Text(
+                "Usamos sua localização apenas para saber quando você sai ou chega em casa e acionar seus objetos. " +
+                    "A localização é processada e guardada somente neste aparelho e não é enviada a servidores. " +
+                    "Os comandos são enviados apenas aos objetos que você cadastrou, na sua rede. " +
+                    "Você pode apagar todos os dados em Ajustes, opção \"Apagar meus dados\"."
+            )
+        },
+        confirmButton = { TextButton(onClick = onFechar) { Text("Entendi") } },
+    )
 }
 
 @Composable

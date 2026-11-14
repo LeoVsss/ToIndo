@@ -30,6 +30,8 @@ import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import br.com.toindo.data.MapaCache
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -73,6 +75,7 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 
 data class ResidenciaUi(
+    val nome: String,
     val latitude: Double,
     val longitude: Double,
     val raioSaidaM: Int,
@@ -84,10 +87,11 @@ data class ResidenciaUi(
 class ResidenciaViewModel : ViewModel() {
     private val r = RepositorioToIndo.residencia.value
     private val _ui = MutableStateFlow(
-        ResidenciaUi(r.latitude, r.longitude, r.raioSaidaM, r.raioAproximacaoM, RepositorioToIndo.configuracao.value.tempoConfirmacaoSaidaSeg)
+        ResidenciaUi(r.nome, r.latitude, r.longitude, r.raioSaidaM, r.raioAproximacaoM, RepositorioToIndo.configuracao.value.tempoConfirmacaoSaidaSeg)
     )
     val ui = _ui.asStateFlow()
 
+    fun nome(v: String) = _ui.update { it.copy(nome = v) }
     fun posicao(lat: Double, lon: Double, precisao: Int?) = _ui.update { it.copy(latitude = lat, longitude = lon, precisaoM = precisao) }
     fun raioSaida(m: Int) = _ui.update { it.copy(raioSaidaM = m, raioAproximacaoM = maxOf(it.raioAproximacaoM, m)) }
     fun raioAproximacao(m: Int) = _ui.update { it.copy(raioAproximacaoM = maxOf(m, it.raioSaidaM)) }
@@ -99,7 +103,7 @@ class ResidenciaViewModel : ViewModel() {
 
     fun salvar() {
         val u = _ui.value
-        RepositorioToIndo.salvarResidencia(Residencia("Casa", u.latitude, u.longitude, u.raioSaidaM, u.raioAproximacaoM), u.confirmacaoSeg)
+        RepositorioToIndo.salvarResidencia(Residencia(u.nome.trim().ifBlank { "Casa" }, u.latitude, u.longitude, u.raioSaidaM, u.raioAproximacaoM), u.confirmacaoSeg)
     }
 }
 
@@ -108,6 +112,7 @@ fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: Residenc
     val ui by vm.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val semInternet = remember { !temInternet(context) }
+    val mapaStatus = remember { mutableStateOf(0) }
     val editando = RepositorioToIndo.cadastroConcluido.value
 
     fun capturarLocalizacao() {
@@ -168,6 +173,14 @@ fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: Residenc
         }
 
         CardToIndo {
+            OutlinedTextField(
+                value = ui.nome,
+                onValueChange = vm::nome,
+                label = { Text("Nome da casa") },
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth().padding(bottom = Espaco.s),
+            )
             ControleRaio("Raio de saída", "${ui.raioSaidaM} m", ui.raioSaidaM.toFloat(), 5f..1000f, ToIndo.extras.presencaTexto) {
                 vm.raioSaida(arredondarRaio(it))
             }
@@ -184,10 +197,38 @@ fun ResidenciaScreen(onVoltar: () -> Unit, onContinuar: () -> Unit, vm: Residenc
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.s)) {
-            Icon(Icons.Rounded.Check, null, tint = ToIndo.extras.economiaTexto, modifier = Modifier.size(18.dp))
-            Text("Mapa da região salvo para uso sem internet", style = MaterialTheme.typography.bodyMedium, color = ToIndo.extras.economiaTexto)
+        val textoMapa = when (mapaStatus.value) {
+            1 -> "Baixando o mapa da região..."
+            2 -> "Mapa da região salvo para uso sem internet"
+            3 -> "Não foi possível baixar todo o mapa. Tente de novo com internet."
+            else -> "Baixe o mapa desta região para usar sem internet"
         }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Espaco.s)) {
+            Icon(
+                if (mapaStatus.value == 2) Icons.Rounded.Check else Icons.Rounded.WifiOff, null,
+                tint = if (mapaStatus.value == 2) ToIndo.extras.economiaTexto else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                textoMapa, style = MaterialTheme.typography.bodyMedium,
+                color = if (mapaStatus.value == 2) ToIndo.extras.economiaTexto else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        OutlinedButton(
+            onClick = {
+                if (!temInternet(context)) {
+                    Toast.makeText(context, "Sem internet para baixar o mapa.", Toast.LENGTH_SHORT).show()
+                } else {
+                    mapaStatus.value = 1
+                    MapaCache.baixar(context, ui.latitude, ui.longitude, ui.raioAproximacaoM) { ok ->
+                        mapaStatus.value = if (ok) 2 else 3
+                    }
+                }
+            },
+            enabled = mapaStatus.value != 1,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape = MaterialTheme.shapes.medium,
+        ) { Text("Baixar mapa desta região", style = MaterialTheme.typography.titleSmall) }
 
         BotaoPrincipal(if (editando) "Salvar" else "Continuar", onClick = { vm.salvar(); onContinuar() }, modifier = Modifier.padding(bottom = Espaco.xl))
     }

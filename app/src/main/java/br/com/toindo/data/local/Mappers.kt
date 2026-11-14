@@ -61,6 +61,7 @@ fun ObjetoEntity.paraDominio() = ObjetoInteligente(
     acaoAoChegar = acaoAoChegar,
     automacaoPausada = automacaoPausada,
     ligadoDesde = ligadoDesdeMillis?.let { horaFmt.format(Date(it)) },
+    ligadoDesdeMillis = ligadoDesdeMillis,
 )
 
 fun ObjetoInteligente.paraEntity(ligadoDesdeMillis: Long?) = ObjetoEntity(

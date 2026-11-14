@@ -38,6 +38,7 @@ import br.com.toindo.ui.screens.ConsumoScreen
 import br.com.toindo.ui.screens.DetalheObjetoScreen
 import br.com.toindo.ui.screens.HistoricoScreen
 import br.com.toindo.ui.screens.InicioScreen
+import br.com.toindo.ui.screens.ObjetosScreen
 import br.com.toindo.ui.screens.ResidenciaScreen
 import br.com.toindo.ui.screens.SaidaDetalheScreen
 import br.com.toindo.ui.screens.SaidasScreen
@@ -53,6 +54,7 @@ object Rotas {
     const val CONSUMO = "consumo"
     const val HISTORICO = "historico"
     const val AJUSTES = "ajustes"
+    const val OBJETOS = "objetos"
 
     fun objeto(id: Long) = "objeto/$id"
     const val SAIDAS = "saidas"
@@ -145,11 +147,18 @@ fun ToIndoApp(navController: NavHostController = rememberNavController()) {
             composable(Rotas.AJUSTES) {
                 AjustesScreen(
                     onEditarResidencia = { navController.navigate(Rotas.RESIDENCIA) },
-                    onObjetos = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
+                    onObjetos = { navController.navigate(Rotas.OBJETOS) },
                     onAbrirSaidas = { navController.navigate(Rotas.SAIDAS) },
                     onDadosApagados = {
                         navController.navigate(Rotas.BOAS_VINDAS) { popUpTo(0) { inclusive = true } }
                     },
+                )
+            }
+            composable(Rotas.OBJETOS) {
+                ObjetosScreen(
+                    onVoltar = { navController.popBackStack() },
+                    onAbrirObjeto = { navController.navigate(Rotas.objeto(it)) },
+                    onAdicionar = { navController.navigate(Rotas.ADICIONAR_OBJETO) },
                 )
             }
             composable(Rotas.SAIDAS) {

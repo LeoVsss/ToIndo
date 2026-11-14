@@ -1,5 +1,6 @@
 package br.com.toindo.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import br.com.toindo.model.AcaoPresenca
@@ -95,6 +96,7 @@ data class SaidaItemEntity(
     val naSaida: String,
     val motivo: String,
     val naVolta: String?,
+    @ColumnInfo(defaultValue = "0") val potenciaW: Int = 0,
 )
 
 object ResultadoSaida {

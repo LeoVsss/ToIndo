@@ -127,7 +127,10 @@ object RepositorioToIndo {
             }
         }
 
-        escopo.launch { semearSeVazio() }
+        escopo.launch {
+            semearSeVazio()
+            sincronizarPendentes()
+        }
 
         escopo.launch {
             db.objetoDao().observarTodos().collect { lista ->
@@ -415,7 +418,7 @@ object RepositorioToIndo {
         fun item(e: ObjetoEntity, resultado: String, motivo: String) {
             itens += SaidaItemEntity(
                 saidaId = agora, objetoId = e.id, nome = e.nome, comodo = e.comodo,
-                naSaida = resultado, motivo = motivo, naVolta = null,
+                naSaida = resultado, motivo = motivo, naVolta = null, potenciaW = e.potenciaW,
             )
         }
 
@@ -557,7 +560,7 @@ object RepositorioToIndo {
                 motivo = motivo,
                 tipoObjeto = objeto.tipo,
                 instanteMillis = instante,
-                sincronizado = false,
+                sincronizado = true,
             )
         )
     }

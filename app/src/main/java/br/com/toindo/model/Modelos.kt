@@ -65,6 +65,7 @@ data class ObjetoInteligente(
     val acaoAoChegar: AcaoPresenca = tipo.aoChegarPadrao,
     val automacaoPausada: Boolean = false,
     val ligadoDesde: String? = null,
+    val ligadoDesdeMillis: Long? = null,
 ) {
     val ligado get() = estado == EstadoDispositivo.LIGADO
 }

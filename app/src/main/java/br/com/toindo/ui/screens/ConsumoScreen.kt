@@ -48,11 +48,14 @@ import br.com.toindo.ui.components.SeloEstimado
 import br.com.toindo.ui.components.TituloDeTela
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
+import br.com.toindo.model.ObjetoInteligente
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
 import br.com.toindo.data.local.RegistroConsumoEntity
@@ -68,9 +71,25 @@ class ConsumoViewModel : ViewModel() {
     val periodo = _periodo.asStateFlow()
     fun escolher(p: Periodo) { _periodo.value = p }
 
+    private val relogio = flow {
+        while (true) {
+            emit(System.currentTimeMillis())
+            delay(30_000)
+        }
+    }
+
+    private fun registrosEmAndamento(objetos: List<ObjetoInteligente>, agora: Long, tarifa: Double) =
+        objetos.mapNotNull { o ->
+            val inicio = o.ligadoDesdeMillis?.takeIf { o.ligado && it < agora } ?: return@mapNotNull null
+            val kWh = CalculadoraConsumo.kWh(o.potenciaW, agora - inicio)
+            RegistroConsumoEntity(0, o.id, o.nome, inicio, agora, kWh, CalculadoraConsumo.custo(kWh, tarifa))
+        }
+
     val ui: StateFlow<ConsumoUi> = combine(
         _periodo, RepositorioToIndo.registrosConsumo, RepositorioToIndo.saidas, RepositorioToIndo.configuracao,
-    ) { p, registros, saidas, config ->
+        combine(RepositorioToIndo.objetos, relogio) { objetos, agora -> objetos to agora },
+    ) { p, registrosFechados, saidas, config, estado ->
+        val registros = registrosFechados + registrosEmAndamento(estado.first, estado.second, config.tarifaKwh)
         val desde = inicioDoPeriodo(p)
         val doPeriodo = registros.filter { it.fimMillis >= desde }
         val porObjeto = doPeriodo.groupBy { it.objetoNome }
@@ -81,7 +100,7 @@ class ConsumoViewModel : ViewModel() {
         val kWhEvitado = saidas.filter { it.saida.saiuEmMillis >= desde }.sumOf { s ->
             val fim = s.saida.voltouEmMillis ?: agora
             s.itens.filter { it.naSaida == ResultadoSaida.DESLIGOU }
-                .sumOf { CalculadoraConsumo.kWh(RepositorioToIndo.potenciaW(it.objetoId), fim - s.saida.saiuEmMillis) }
+                .sumOf { CalculadoraConsumo.kWh(if (it.potenciaW > 0) it.potenciaW else RepositorioToIndo.potenciaW(it.objetoId), fim - s.saida.saiuEmMillis) }
         }
 
         val (rotulos, valores) = ultimosSeteDias(registros)
