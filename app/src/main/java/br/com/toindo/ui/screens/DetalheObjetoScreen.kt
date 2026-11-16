@@ -54,6 +54,7 @@ import br.com.toindo.ui.components.TopoComVoltar
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
 
+// #MVVM
 class DetalheObjetoViewModel : ViewModel() {
     val objetos = RepositorioToIndo.objetos
     fun alternar(id: Long) = RepositorioToIndo.alternar(id)

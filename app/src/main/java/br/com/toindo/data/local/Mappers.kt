@@ -13,6 +13,7 @@ import java.util.Locale
 
 private val horaFmt = SimpleDateFormat("HH:mm", Locale("pt", "BR"))
 
+// #Mapper
 fun ResidenciaEntity.paraDominio() = Residencia(
     nome = nome,
     latitude = latitude,

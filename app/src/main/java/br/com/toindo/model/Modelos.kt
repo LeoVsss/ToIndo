@@ -1,7 +1,9 @@
 package br.com.toindo.model
 
+// #State
 enum class EstadoDispositivo { LIGADO, DESLIGADO, INDISPONIVEL }
 
+// #State
 enum class EstadoPresenca { EM_CASA, CONFIRMANDO_SAIDA, FORA, CHEGANDO }
 
 enum class AcaoPresenca(val rotulo: String) {

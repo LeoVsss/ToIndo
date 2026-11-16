@@ -4,6 +4,7 @@ import br.com.toindo.BuildConfig
 import br.com.toindo.model.Controle
 import kotlin.coroutines.cancellation.CancellationException
 
+// #Strategy
 interface ServicoDispositivo {
     suspend fun ping(endereco: String): Boolean
     suspend fun ligar(endereco: String): Boolean
@@ -11,6 +12,7 @@ interface ServicoDispositivo {
     suspend fun ajustar(endereco: String, controle: Controle, valor: Int): Boolean
 }
 
+// #Strategy (implementação HTTP)
 class ServicoDispositivoHttp(private val api: ToIndoApi) : ServicoDispositivo {
 
     override suspend fun ping(endereco: String) =

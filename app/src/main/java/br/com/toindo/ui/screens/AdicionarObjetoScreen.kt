@@ -77,6 +77,7 @@ data class NovoObjetoUi(
         endereco.isNotBlank() && endereco.none { it.isWhitespace() }
 }
 
+// #MVVM
 class AdicionarObjetoViewModel : ViewModel() {
     private val _ui = MutableStateFlow(NovoObjetoUi())
     val ui = _ui.asStateFlow()

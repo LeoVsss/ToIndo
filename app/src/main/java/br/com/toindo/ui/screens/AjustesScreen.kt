@@ -39,6 +39,7 @@ import br.com.toindo.ui.components.TituloDeTela
 import br.com.toindo.ui.theme.Espaco
 import br.com.toindo.ui.theme.ToIndo
 
+// #MVVM
 class AjustesViewModel : ViewModel() {
     val configuracao = RepositorioToIndo.configuracao
     val residencia = RepositorioToIndo.residencia

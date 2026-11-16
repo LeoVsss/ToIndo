@@ -22,12 +22,14 @@ interface ToIndoApi {
     ): RespostaComandoDto
 }
 
+// #DTO
 data class ComandoDto(
     val acao: String,
     val controle: String? = null,
     val valor: Int? = null,
 )
 
+// #DTO
 data class RespostaComandoDto(
     val ok: Boolean = false,
     val estado: String? = null,

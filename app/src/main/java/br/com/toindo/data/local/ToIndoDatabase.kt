@@ -39,6 +39,7 @@ abstract class ToIndoDatabase : RoomDatabase() {
             }
         }
 
+        // #Singleton
         @Volatile private var instancia: ToIndoDatabase? = null
 
         fun obter(context: Context): ToIndoDatabase =

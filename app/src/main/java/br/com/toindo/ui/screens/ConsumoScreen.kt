@@ -66,6 +66,7 @@ import java.util.Calendar
 
 enum class Periodo(val rotulo: String) { DIA("Dia"), SEMANA("Semana"), MES("Mês") }
 
+// #MVVM
 class ConsumoViewModel : ViewModel() {
     private val _periodo = MutableStateFlow(Periodo.SEMANA)
     val periodo = _periodo.asStateFlow()

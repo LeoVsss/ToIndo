@@ -51,6 +51,7 @@ data class HistoricoUi(
     val porDia: Map<String, List<EventoObjeto>> = emptyMap(),
 )
 
+// #MVVM
 class HistoricoViewModel : ViewModel() {
     private val filtro = MutableStateFlow<OrigemEvento?>(null)
     val ui = combine(RepositorioToIndo.eventos, filtro) { eventos, f ->

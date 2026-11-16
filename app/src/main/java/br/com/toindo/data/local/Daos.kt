@@ -8,6 +8,7 @@ import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
+// #DAO
 @Dao
 interface ResidenciaDao {
     @Query("SELECT * FROM residencia WHERE id = 1")
@@ -20,6 +21,7 @@ interface ResidenciaDao {
     suspend fun salvar(residencia: ResidenciaEntity)
 }
 
+// #DAO
 @Dao
 interface ConfiguracaoDao {
     @Query("SELECT * FROM configuracao WHERE id = 1")
@@ -32,6 +34,7 @@ interface ConfiguracaoDao {
     suspend fun salvar(config: ConfiguracaoEntity)
 }
 
+// #DAO
 @Dao
 interface ObjetoDao {
     @Query("SELECT * FROM objetos ORDER BY id")
@@ -53,6 +56,7 @@ interface ObjetoDao {
     suspend fun remover(id: Long)
 }
 
+// #DAO
 @Dao
 interface EventoDao {
     @Query("SELECT * FROM eventos ORDER BY instanteMillis DESC")
@@ -68,6 +72,7 @@ interface EventoDao {
     suspend fun marcarSincronizado(id: Long)
 }
 
+// #DAO
 @Dao
 interface RegistroConsumoDao {
     @Insert
@@ -90,6 +95,7 @@ interface RegistroConsumoDao {
 data class ConsumoAgrupado(val nome: String, val kWh: Double, val custo: Double)
 data class IntervaloConsumo(val inicioMillis: Long, val fimMillis: Long, val kWh: Double)
 
+// #DAO
 @Dao
 interface PresencaDao {
     @Query("SELECT * FROM presenca WHERE id = 1")
@@ -104,6 +110,7 @@ data class SaidaComItens(
     @androidx.room.Relation(parentColumn = "id", entityColumn = "saidaId") val itens: List<SaidaItemEntity>,
 )
 
+// #DAO
 @Dao
 interface SaidaDao {
     @Insert

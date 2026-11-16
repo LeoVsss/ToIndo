@@ -46,6 +46,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+// #Repository
+// #Singleton
 object RepositorioToIndo {
 
     private val escopo = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -66,6 +68,7 @@ object RepositorioToIndo {
 
     const val PRECISAO_MAX_M = 30
 
+    // #Observer
     private val _residencia = MutableStateFlow(Residencia("Casa", -23.5505, -46.6333))
     val residencia: StateFlow<Residencia> = _residencia.asStateFlow()
 

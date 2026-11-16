@@ -64,6 +64,7 @@ data class InicioUi(
     val total: Int = 0,
 )
 
+// #MVVM
 class InicioViewModel : ViewModel() {
     private val filtro = MutableStateFlow<String?>(null)
 

@@ -4,10 +4,12 @@ import br.com.toindo.model.AcaoPresenca
 import br.com.toindo.model.EstadoPresenca
 import br.com.toindo.model.ObjetoInteligente
 
+// #Singleton
 object MotorAutomacao {
 
     enum class Decisao { LIGAR, DESLIGAR, MANTER }
 
+    // #State
     fun proximaPresenca(
         atual: EstadoPresenca,
         distanciaM: Double,

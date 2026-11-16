@@ -84,6 +84,7 @@ data class ResidenciaUi(
     val precisaoM: Int? = null,
 )
 
+// #MVVM
 class ResidenciaViewModel : ViewModel() {
     private val r = RepositorioToIndo.residencia.value
     private val _ui = MutableStateFlow(
