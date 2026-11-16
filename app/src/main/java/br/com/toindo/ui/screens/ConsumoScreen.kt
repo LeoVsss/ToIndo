@@ -58,13 +58,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import androidx.lifecycle.viewModelScope
-import br.com.toindo.data.local.RegistroConsumoEntity
 import br.com.toindo.data.local.ResultadoSaida
 import br.com.toindo.domain.CalculadoraConsumo
 import br.com.toindo.model.ConsumoObjeto
-import java.util.Calendar
-
-enum class Periodo(val rotulo: String) { DIA("Dia"), SEMANA("Semana"), MES("Mês") }
+import br.com.toindo.domain.AgregadorConsumo
+import br.com.toindo.domain.BarraConsumo
+import br.com.toindo.domain.Periodo
+import br.com.toindo.domain.SessaoConsumo
 
 // #MVVM
 class ConsumoViewModel : ViewModel() {
@@ -83,75 +83,43 @@ class ConsumoViewModel : ViewModel() {
         objetos.mapNotNull { o ->
             val inicio = o.ligadoDesdeMillis?.takeIf { o.ligado && it < agora } ?: return@mapNotNull null
             val kWh = CalculadoraConsumo.kWh(o.potenciaW, agora - inicio)
-            RegistroConsumoEntity(0, o.id, o.nome, inicio, agora, kWh, CalculadoraConsumo.custo(kWh, tarifa))
+            SessaoConsumo(o.id, o.nome, inicio, agora, kWh, CalculadoraConsumo.custo(kWh, tarifa))
         }
 
     val ui: StateFlow<ConsumoUi> = combine(
         _periodo, RepositorioToIndo.registrosConsumo, RepositorioToIndo.saidas, RepositorioToIndo.configuracao,
         combine(RepositorioToIndo.objetos, relogio) { objetos, agora -> objetos to agora },
     ) { p, registrosFechados, saidas, config, estado ->
-        val registros = registrosFechados + registrosEmAndamento(estado.first, estado.second, config.tarifaKwh)
-        val desde = inicioDoPeriodo(p)
-        val doPeriodo = registros.filter { it.fimMillis >= desde }
-        val porObjeto = doPeriodo.groupBy { it.objetoNome }
-            .map { (nome, l) -> ConsumoObjeto(nome, l.sumOf { it.kWh }, l.sumOf { it.custo }) }
-            .sortedByDescending { it.kWh }
+        val agora = estado.second
+        val sessoes = registrosFechados.map {
+            SessaoConsumo(it.objetoId, it.objetoNome, it.inicioMillis, it.fimMillis, it.kWh, it.custo)
+        } + registrosEmAndamento(estado.first, agora, config.tarifaKwh)
+        val resumo = AgregadorConsumo.resumir(sessoes, p, agora)
 
-        val agora = System.currentTimeMillis()
-        val kWhEvitado = saidas.filter { it.saida.saiuEmMillis >= desde }.sumOf { s ->
+        val kWhEvitado = saidas.sumOf { s ->
             val fim = s.saida.voltouEmMillis ?: agora
+            val noPeriodo = AgregadorConsumo.sobreposicaoMillis(s.saida.saiuEmMillis, fim, resumo.inicioMillis, resumo.fimMillis)
             s.itens.filter { it.naSaida == ResultadoSaida.DESLIGOU }
-                .sumOf { CalculadoraConsumo.kWh(if (it.potenciaW > 0) it.potenciaW else RepositorioToIndo.potenciaW(it.objetoId), fim - s.saida.saiuEmMillis) }
+                .sumOf { CalculadoraConsumo.kWh(if (it.potenciaW > 0) it.potenciaW else RepositorioToIndo.potenciaW(it.objetoId), noPeriodo) }
         }
 
-        val (rotulos, valores) = ultimosSeteDias(registros)
         ConsumoUi(
-            totalKwh = doPeriodo.sumOf { it.kWh },
-            totalCusto = doPeriodo.sumOf { it.custo },
-            porObjeto = porObjeto,
+            totalKwh = resumo.totalKwh,
+            totalCusto = resumo.totalCusto,
+            porObjeto = resumo.porObjeto.map { ConsumoObjeto(it.nome, it.kWh, it.custo) },
             economia = CalculadoraConsumo.custo(kWhEvitado, config.tarifaKwh),
             tarifa = config.tarifaKwh,
-            dias = rotulos,
-            valores = valores,
+            barras = resumo.barras,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConsumoUi())
-
-    private fun inicioDoPeriodo(p: Periodo): Long {
-        val c = Calendar.getInstance()
-        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
-        when (p) {
-            Periodo.DIA -> Unit
-            Periodo.SEMANA -> c.add(Calendar.DAY_OF_YEAR, -6)
-            Periodo.MES -> c.add(Calendar.DAY_OF_YEAR, -29)
-        }
-        return c.timeInMillis
-    }
-
-    private fun ultimosSeteDias(registros: List<RegistroConsumoEntity>): Pair<List<String>, List<Double>> {
-        val nomes = listOf("Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
-        val rotulos = mutableListOf<String>()
-        val valores = mutableListOf<Double>()
-        for (diasAtras in 6 downTo 0) {
-            val ini = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-                add(Calendar.DAY_OF_YEAR, -diasAtras)
-            }
-            val fim = ini.timeInMillis + 24L * 60 * 60 * 1000
-            rotulos += if (diasAtras == 0) "Hoje" else nomes[ini.get(Calendar.DAY_OF_WEEK) - 1]
-            valores += registros.filter { it.fimMillis >= ini.timeInMillis && it.fimMillis < fim }.sumOf { it.kWh }
-        }
-        return rotulos to valores
-    }
 }
-
 data class ConsumoUi(
     val totalKwh: Double = 0.0,
     val totalCusto: Double = 0.0,
     val porObjeto: List<ConsumoObjeto> = emptyList(),
     val economia: Double = 0.0,
     val tarifa: Double = 0.79,
-    val dias: List<String> = emptyList(),
-    val valores: List<Double> = emptyList(),
+    val barras: List<BarraConsumo> = emptyList(),
 )
 
 fun Double.brl(): String = "R$ " + "%.2f".format(this).replace('.', ',')
@@ -178,7 +146,7 @@ fun ConsumoScreen(vm: ConsumoViewModel = viewModel()) {
                 }
                 SeloEstimado()
             }
-            GraficoBarras(ui.dias, ui.valores)
+            GraficoBarras(ui.barras)
         }
 
         CardToIndo(padding = Espaco.l) {
@@ -240,31 +208,37 @@ private fun SeletorPeriodo(atual: Periodo, onEscolher: (Periodo) -> Unit) {
 }
 
 @Composable
-private fun GraficoBarras(rotulos: List<String>, valores: List<Double>) {
+private fun GraficoBarras(barras: List<BarraConsumo>) {
+    val valores = barras.map { it.kWh }
     val max = valores.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-    val ultimo = valores.lastIndex
+    val atual = barras.indexOfFirst { it.atual }
+    val denso = barras.size > 7
+    val espaco = if (denso) 2.dp else 10.dp
     Column(Modifier.padding(top = Espaco.l).semantics(mergeDescendants = true) {
-        contentDescription = "Consumo diário: " + rotulos.zip(valores).joinToString { (d, v) -> "$d ${v.kwh()}" }
+        contentDescription = "Consumo: " + barras.joinToString { "${it.descricao} ${it.kWh.kwh()}" }
     }) {
-        Row(Modifier.fillMaxWidth().height(170.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-            valores.forEachIndexed { i, v ->
+        Row(Modifier.fillMaxWidth().height(170.dp), horizontalArrangement = Arrangement.spacedBy(espaco), verticalAlignment = Alignment.Bottom) {
+            barras.forEachIndexed { i, b ->
                 Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
-                    Text("%.1f".format(v).replace('.', ','), style = MaterialTheme.typography.labelSmall,
-                        color = if (i == ultimo) ToIndo.extras.energiaTexto else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!denso) {
+                        Text("%.1f".format(b.kWh).replace('.', ','), style = MaterialTheme.typography.labelSmall,
+                            color = if (i == atual) ToIndo.extras.energiaTexto else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     Box(
-                        Modifier.padding(top = 4.dp).fillMaxWidth().fillMaxHeight((v / max).toFloat() * 0.82f)
-                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                            .background(if (i == ultimo) ToIndo.extras.energiaBarraDestaque else ToIndo.extras.energiaBarra)
+                        Modifier.padding(top = 4.dp).fillMaxWidth().fillMaxHeight((b.kWh / max).toFloat() * 0.82f)
+                            .clip(RoundedCornerShape(topStart = if (denso) 2.dp else 6.dp, topEnd = if (denso) 2.dp else 6.dp))
+                            .background(if (i == atual) ToIndo.extras.energiaBarraDestaque else ToIndo.extras.energiaBarra)
                     )
                 }
             }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outline))
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            rotulos.forEachIndexed { i, d ->
-                Text(d, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f),
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(espaco)) {
+            barras.forEachIndexed { i, b ->
+                Text(b.rotulo, style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f),
+                    maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    color = if (i == ultimo) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = if (i == atual) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
